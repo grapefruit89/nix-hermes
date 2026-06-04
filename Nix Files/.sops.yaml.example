@@ -1,0 +1,24 @@
+# ==============================================================================
+# SOPS Encryption Configuration ( .sops.yaml.example )
+# ==============================================================================
+# Place this file in the root of your nix configuration directory as `.sops.yaml`.
+# This file defines the encryption keys (age keys) allowed to decrypt and edit
+# your `secrets.sops.yaml` secrets store.
+#
+# Generate age public keys from your system:
+# 1. Your personal age key (on your client machine): `age-keygen -o key.txt`
+# 2. Host key (on NixOS server): `ssh-to-age < /etc/ssh/ssh_host_ed25519_key.pub`
+# ==============================================================================
+
+keys:
+  # Define key aliases for readability
+  - &admin_moritz age1yourpersonalagepublickeyherexxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  - &host_q958    age1yourhostagepublickeyherexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+creation_rules:
+  # Apply these keys specifically to all secrets files matching secrets.sops.yaml
+  - path_regex: secrets\.sops\.yaml$
+    key_groups:
+      - age:
+          - *admin_moritz
+          - *host_q958

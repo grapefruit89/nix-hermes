@@ -1,0 +1,438 @@
+# ---NIXMETA---
+# domain:    30-storage
+# id:        NIXH-30-STO
+# status:    active
+# provides:
+#   - my.impermanence.enable
+#   - my.services.storage.enable
+#   - my.services.restic-backup.enable
+# requires:
+#   - 00-core
+#   - 10-network
+#   - 20-security
+# adr:       ADR-30-storage.md
+# guide:     30-storage.md
+# complexity: 4
+# reviewed:  2026-05-26
+# ---ENDNIXMETA---
+
+# ==============================================================================
+# PURPOSE
+# ==============================================================================
+# Configures the active hybrid storage pool, sets up stateless impermanence binds,
+# deploys the udev pending disks watchdog, and schedules the Restic cloud sync.
+# Key decisions -> ADR-30-storage.md
+
+{ config, lib, pkgs, ... }:
+
+let
+  cfgImp = config.my.impermanence;
+  cfgStorage = config.my.services.storage;
+  cfgBackup = config.my.services.restic-backup;
+
+  ramGB = config.my.configs.hardware.ramGB;
+  domain = config.my.configs.identity.domain;
+
+  # Tier A (NVMe/SSD Cache): Persistent high-priority states
+  tierA = {
+    paths = [
+      "/var/lib/sops-nix"
+      "/var/lib/nixos"
+      "/etc/nixos"
+      "/var/lib/tailscale"
+      "/var/lib/postgresql"
+      "/var/lib/vaultwarden"
+      "/var/lib/jellyfin"
+      "/var/lib/jellyseerr"
+      "/var/lib/sonarr"
+      "/var/lib/radarr"
+      "/var/lib/readarr"
+      "/var/lib/prowlarr"
+      "/var/lib/sabnzbd"
+      "/var/lib/AdGuardHome"
+      "/var/lib/pocket-id"
+      "/var/lib/hass"
+      "/var/lib/zigbee2mqtt"
+      "/var/lib/mosquitto"
+      "/var/lib/n8n"
+      "/var/lib/paperless"
+      "/var/lib/linkwarden"
+      "/var/lib/loki"
+      "/var/lib/grafana"
+      "/var/lib/crowdsec"
+      "/var/lib/forgejo"
+      "/var/lib/semaphore"
+    ];
+    files = [
+      "/etc/machine-id"
+      "/etc/ssh/ssh_host_ed25519_key"
+    ];
+  };
+
+  # Tier B (SSD Pool): Speed-sensitive volatile caches and incomplete downloads
+  tierB = {
+    paths = [
+      "/mnt/fast_pool/cache"
+      "/mnt/fast_pool/downloads"
+      "/var/cache"
+    ];
+  };
+
+in
+{
+  # ============================================================================
+  # OPTIONS
+  # ============================================================================
+  options.my = {
+    impermanence = {
+      enable = lib.mkEnableOption "Sovereign Impermanence (ephemeral tmpfs root)";
+      persistentDisk = lib.mkOption {
+        type = lib.types.str;
+        default = "/dev/disk/by-label/NIXHOME_PERSIST";
+        description = "Blockdevice labeled NIXHOME_PERSIST (Tier A SSD).";
+      };
+      persistMountPoint = lib.mkOption {
+        type = lib.types.str;
+        default = "/persist";
+        description = "Primary persistent mount point path.";
+      };
+    };
+
+    services.storage = {
+      enable = lib.mkEnableOption "Hybrid MergerFS & ext4 pool pool config";
+      poolMountPoint = lib.mkOption {
+        type = lib.types.str;
+        default = "/mnt/media";
+        description = "Shared virtual folder pool target.";
+      };
+    };
+
+    services.storage-mover = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = config.my.services.storage.enable;
+        description = "Enable Precision Storage Cache Mover (rclone local engine).";
+      };
+      sourceDir = lib.mkOption {
+        type = lib.types.str;
+        default = "/mnt/fast_pool/downloads";
+        description = "SSD cache source directory (Tier B).";
+      };
+      targetDir = lib.mkOption {
+        type = lib.types.str;
+        default = "/mnt/media/downloads";
+        description = "HDD pool target directory (Tier C).";
+      };
+      minAge = lib.mkOption {
+        type = lib.types.str;
+        default = "30d";
+        description = "Minimum file age before migration (rclone format, e.g., 30d).";
+      };
+      capacityThreshold = lib.mkOption {
+        type = lib.types.int;
+        default = 85;
+        description = "Cache disk capacity percentage that forces migration regardless of HDD state.";
+      };
+      onCalendar = lib.mkOption {
+        type = lib.types.str;
+        default = "*-*-* 03:00:00";
+        description = "Execution cron-style trigger interval.";
+      };
+    };
+
+    services.restic-backup = {
+      enable = lib.mkEnableOption "Restic offsite S3 backup schedule";
+      healthcheckUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Dead Man's Switch heartbeat URL.";
+      };
+    };
+  };
+
+  # ============================================================================
+  # CONFIG
+  # ============================================================================
+  config = lib.mkMerge [
+    # ── SOVEREIGN IMPERMANENCE (TMPFS /) ──────────────────────────────────────
+    (lib.mkIf cfgImp.enable {
+      # Stateless root on RAM (tmpfs) & persistent storage partition & declarative bind mounts
+      fileSystems = {
+        "/" = lib.mkForce {
+          device = "none";
+          fsType = "tmpfs";
+          options = [ "defaults" "size=16G" "mode=755" ];
+        };
+
+        "${cfgImp.persistMountPoint}" = {
+          device = cfgImp.persistentDisk;
+          fsType = "ext4";
+          neededForBoot = true;
+        };
+      } // lib.listToAttrs (
+        map
+          (path: {
+            name = path;
+            value = {
+              device = "${cfgImp.persistMountPoint}${path}";
+              fsType = "none";
+              options = [ "bind" ];
+              depends = [ cfgImp.persistMountPoint ];
+            };
+          })
+          tierA.paths
+      ) // lib.listToAttrs (
+        map
+          (file: {
+            name = file;
+            value = {
+              device = "${cfgImp.persistMountPoint}${file}";
+              fsType = "none";
+              options = [ "bind" ];
+              depends = [ cfgImp.persistMountPoint ];
+            };
+          })
+          tierA.files
+      );
+
+      # Enforce state structure creation in /persist
+      systemd.tmpfiles.rules =
+        (map (p: "d ${cfgImp.persistMountPoint}${p} 0755 root root -") tierA.paths) ++
+        (map (p: "d ${p} 0755 root root -") tierB.paths);
+    })
+
+    # ── MERGERFS HYBRID POOLING ───────────────────────────────────────────────
+    (lib.mkIf cfgStorage.enable {
+      boot.supportedFilesystems = [ "zfs" "ext4" ];
+
+      # Pooling mounts
+      # Pool for Tier B (Slower SSDs, Caches, Downloads)
+      fileSystems."/mnt/fast_pool" = {
+        device = "mergerfs";
+        fsType = "fuse.mergerfs";
+        options = [
+          "defaults"
+          "allow_other"
+          "minfreespace=10G"
+          "category.create=mfs"
+          "branches=/mnt/tier-b/*"
+        ];
+      };
+
+      # Pool for Tier C (HDDs, Cold Storage)
+      fileSystems."${cfgStorage.poolMountPoint}" = {
+        device = "mergerfs";
+        fsType = "fuse.mergerfs";
+        # category.create=epmfs: distributes files across Tier C drives
+        # minfreespace=50G: avoids drive overflow
+        # dropcacheonclose=true: enables fast HDD spindown via hd-idle
+        options = [
+          "defaults"
+          "allow_other"
+          "category.create=epmfs"
+          "minfreespace=50G"
+          "dropcacheonclose=true"
+          "branches=/mnt/tier-c/*"
+        ];
+      };
+
+      # Pool for all external devices
+      fileSystems."/mnt/external_pool" = {
+        device = "mergerfs";
+        fsType = "fuse.mergerfs";
+        options = [
+          "defaults"
+          "allow_other"
+          "minfreespace=1G"
+          "category.create=mfs"
+          "branches=/mnt/external/*"
+        ];
+      };
+
+      # Setgid enforcing for media group (GID 169)
+      users.groups.media.gid = 169;
+
+      # Create parent mount points and temporary state dirs
+      systemd.tmpfiles.rules = [
+        "d /mnt/tier-a 0775 root media -"
+        "d /mnt/tier-b 0775 root media -"
+        "d /mnt/tier-c 0775 root media -"
+        "d /mnt/external 0775 root media -"
+        "d /run/nixhome-pending-disks 0755 root root -"
+      ];
+
+      # ── PENDING DISKS WATCHER ───────────────────────────────────────────────
+      systemd.services.nixhome-pending-watcher = {
+        description = "Scans for new unlabelled legacy drives";
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = pkgs.writeShellScript "pending-watcher" ''
+            set -euo pipefail
+            PENDING_DIR="/run/nixhome-pending-disks"
+            mkdir -p "$PENDING_DIR"
+
+            # Check raw disks using blkid
+            for dev in /dev/sd*; do
+              [ -b "$dev" ] || continue
+              # If it has no filesystem label, mark it pending
+              if ! ${pkgs.util-linux}/bin/blkid -o value -s LABEL "$dev" >/dev/null 2>&1; then
+                echo "Unlabelled disk found: $dev"
+                echo "PENDING:$dev:$(date -Iseconds)" > "$PENDING_DIR/$(basename "$dev").pending"
+              fi
+            done
+          '';
+
+          # Sandboxing & Hardening
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          PrivateNetwork = true;
+          ReadWritePaths = [ "/run/nixhome-pending-disks" ];
+          CapabilityBoundingSet = [ "CAP_SYS_ADMIN" ];
+        };
+      };
+
+      systemd.timers.nixhome-pending-watcher = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "1min";
+          OnUnitActiveSec = "5min";
+          RandomizedDelaySec = "15";
+        };
+      };
+    })
+
+    # ── RESTIC ENCRYPTED CLOUD SYNC ───────────────────────────────────────────
+    (lib.mkIf cfgBackup.enable {
+      sops.secrets.restic_password = { owner = "root"; };
+      sops.secrets.restic_s3_creds = { owner = "root"; };
+
+      services.restic.backups.tier-a-sovereign = {
+        initialize = true;
+        passwordFile = config.sops.secrets.restic_password.path;
+        environmentFile = config.sops.secrets.restic_s3_creds.path;
+
+        paths = [
+          "${cfgImp.persistMountPoint}/var/lib/postgresql"
+          "${cfgImp.persistMountPoint}/var/lib/vaultwarden"
+          "${cfgImp.persistMountPoint}/var/lib/pocket-id"
+          "${cfgImp.persistMountPoint}/var/lib/AdGuardHome"
+          "${cfgImp.persistMountPoint}/etc/nixos"
+        ];
+
+        pruneOpts = [
+          "--keep-daily 7"
+          "--keep-weekly 4"
+        ];
+
+        # Stop active database and application services to prevent write drift during backup
+        backupPrepareCommand = ''
+          echo "Stopping active web applications and database services..."
+          systemctl stop paperless-web paperless-scheduler paperless-task-queue n8n home-assistant linkwarden forgejo vaultwarden zigbee2mqtt || true
+          systemctl stop mosquitto postgresql || true
+        '';
+
+        # Restart database and web applications after backup attempt finishes (even on failure)
+        backupCleanupCommand = ''
+          echo "Restarting database and web applications..."
+          systemctl start postgresql mosquitto || true
+          systemctl start paperless-web paperless-scheduler paperless-task-queue n8n home-assistant linkwarden forgejo vaultwarden zigbee2mqtt || true
+        '';
+
+      };
+
+      systemd.services.restic-backups-tier-a-sovereign = {
+        wants = [ "sops-nix.service" ];
+        after = [ "sops-nix.service" ];
+        postStop = lib.mkIf (cfgBackup.healthcheckUrl != "") ''
+          ${pkgs.curl}/bin/curl -fsS -m 10 --retry 5 "${cfgBackup.healthcheckUrl}"
+        '';
+      };
+    })
+
+    # ── PRECISION STORAGE CACHE MOVER ─────────────────────────────────────────
+    (
+      let
+        cfgMover = config.my.services.storage-mover;
+      in
+      lib.mkIf cfgMover.enable {
+        systemd.services.nixhome-storage-mover = {
+          description = "Precision Storage Cache Mover (rclone local engine)";
+          after = [ "local-fs.target" "network.target" "sops-nix.service" ];
+          wants = [ "sops-nix.service" ];
+
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = pkgs.writeShellScript "storage-mover" ''
+              set -euo pipefail
+            
+              # Check current SSD cache capacity
+              CACHE_USAGE=$(df -h "${cfgMover.sourceDir}" | awk 'NR==2 {print $5}' | sed 's/%//')
+            
+              # Helper to check if any of our storage disks are already spinning
+              disks_spinning=false
+              for dev in /dev/disk/by-label/DISK_STORAGE_* /dev/disk/by-label/TIER_C_*; do
+                if [ -e "$dev" ]; then
+                  # hdparm -C returns 0 if active/idle, non-zero if standby/spun down
+                  if ${pkgs.hdparm}/bin/hdparm -C "$dev" 2>/dev/null | grep -q "active/idle"; then
+                    disks_spinning=true
+                    break
+                  fi
+                fi
+              done
+
+              # Hysteresis controller decision logic
+              if [ "$CACHE_USAGE" -ge "${toString cfgMover.capacityThreshold}" ]; then
+                echo "SSD Cache usage critical ($CACHE_USAGE%). Forcing migration to HDDs..."
+              elif [ "$disks_spinning" = true ]; then
+                echo "HDDs are already spinning ($CACHE_USAGE% SSD usage). Performing opportunistic migration..."
+              else
+                echo "HDDs are spun down and SSD usage ($CACHE_USAGE%) is under threshold (${toString cfgMover.capacityThreshold}%). Sleeping to conserve power."
+                exit 0
+              fi
+
+              # Perform the atomic, verified local-to-local move via rclone
+              echo "Starting local file migration from ${cfgMover.sourceDir} to ${cfgMover.targetDir}..."
+              ${pkgs.rclone}/bin/rclone move "${cfgMover.sourceDir}" "${cfgMover.targetDir}" \
+                --min-age "${cfgMover.minAge}" \
+                --delete-empty-src-dirs \
+                --transfers=4 \
+                --checkers=8 \
+                --exclude "**/incomplete/**" \
+                --exclude "**/.staging/**" \
+                -v \
+                --log-file=/var/log/rclone-mover.log
+
+              # Apply GID 169 Setgid inheritance on target directories to avoid permission drift
+              echo "Applying media group permissions to target directories..."
+              find "${cfgMover.targetDir}" -type d -exec chmod g+s {} + || true
+              chown -R root:media "${cfgMover.targetDir}" || true
+              chmod -R 775 "${cfgMover.targetDir}" || true
+            '';
+
+            # Härtung & Sandboxing
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+            PrivateNetwork = true;
+            CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_FOWNER" "CAP_DAC_OVERRIDE" ];
+            ReadWritePaths = [
+              cfgMover.sourceDir
+              cfgMover.targetDir
+              "/var/log"
+            ];
+          };
+        };
+
+        systemd.timers.nixhome-storage-mover = {
+          description = "Precision Storage Cache Mover Timer";
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnCalendar = cfgMover.onCalendar;
+            Persistent = true;
+          };
+        };
+      }
+    )
+  ];
+}

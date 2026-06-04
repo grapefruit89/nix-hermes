@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NetworkConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <EnableIPv4>true</EnableIPv4>
+  <EnableIPv6>false</EnableIPv6>
+  <EnableRemoteAccess>true</EnableRemoteAccess>
+  <KnownProxies>
+    <string>172.16.0.0/12</string>
+  </KnownProxies>
+  <PublishedServerUriBySubnet>
+    <string>https://jellyfin.m7c5.de</string>
+  </PublishedServerUriBySubnet>
+  <AutoDiscovery>false</AutoDiscovery>
+</NetworkConfiguration>

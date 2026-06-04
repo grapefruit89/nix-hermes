@@ -1,0 +1,266 @@
+# ==============================================================================
+# Gatus Endpoints Configuration (gatus-endpoints.yaml.example)
+# ==============================================================================
+# Copy this file to your secrets folder (e.g., secrets/gatus-endpoints.yaml) or 
+# decrypt it dynamically using sops-nix to /etc/gatus/endpoints.yaml.
+# ==============================================================================
+
+endpoints:
+  # ─── STORAGE POOLS (SSH Loopback) ───
+  - name: "mergerfs-fast-pool"
+    group: "storage"
+    url: "ssh://127.0.0.1:22"
+    interval: "2m"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    client:
+      timeout: "25s"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-fast-pool"
+
+  - name: "mergerfs-media-pool"
+    group: "storage"
+    url: "ssh://127.0.0.1:22"
+    interval: "2m"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    client:
+      timeout: "25s"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-media-pool"
+
+  - name: "mergerfs-external-pool"
+    group: "storage"
+    url: "ssh://127.0.0.1:22"
+    interval: "2m"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    client:
+      timeout: "25s"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-external-pool"
+
+  - name: "storage-permissions-drift"
+    group: "storage"
+    url: "ssh://127.0.0.1:22"
+    interval: "1h"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-permissions-drift"
+
+  # ─── NETWORK & CORE ───
+  - name: "internet-ping"
+    group: "network"
+    url: "icmp://1.1.1.1"
+    interval: "30s"
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: "blocky-dns"
+    group: "network"
+    url: "dns://127.0.0.1:53"
+    interval: "1m"
+    dns:
+      query-name: "cloudflare.com"
+      query-type: "A"
+    conditions:
+      - "[DNS_RC] == NOERROR"
+
+  - name: "adguard-home"
+    group: "network"
+    url: "tcp://127.0.0.1:3053"
+    interval: "1m"
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: "ssh-daemon"
+    group: "core"
+    url: "tcp://127.0.0.1:53844"
+    interval: "1m"
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: "postgresql"
+    group: "core"
+    url: "ssh://127.0.0.1:22"
+    interval: "1m"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-postgres-uds"
+
+  - name: "valkey"
+    group: "core"
+    url: "ssh://127.0.0.1:22"
+    interval: "1m"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-valkey-uds"
+
+  # ─── MEDIA ENGINE ───
+  - name: "jellyfin"
+    group: "media"
+    url: "http://127.0.0.1:8096/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "sonarr"
+    group: "media"
+    url: "http://127.0.0.1:8989/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "radarr"
+    group: "media"
+    url: "http://127.0.0.1:7878/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "prowlarr"
+    group: "media"
+    url: "http://127.0.0.1:9696/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "sabnzbd"
+    group: "media"
+    url: "http://127.0.0.1:8080/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  # ─── APPLICATION LAYER ───
+  - name: "pocket-id"
+    group: "apps"
+    url: "http://127.0.0.1:8083/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "vaultwarden"
+    group: "apps"
+    url: "http://127.0.0.1:8000/alive"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "paperless-ngx"
+    group: "apps"
+    url: "http://127.0.0.1:28981/api/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "n8n"
+    group: "apps"
+    url: "http://127.0.0.1:5678/healthz"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "open-webui"
+    group: "apps"
+    url: "http://127.0.0.1:3080/health"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "linkwarden"
+    group: "apps"
+    url: "http://127.0.0.1:3000/api/health"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "filebrowser"
+    group: "apps"
+    url: "http://127.0.0.1:20001/health"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  # ─── FORGE & MANAGEMENT ───
+  - name: "forgejo"
+    group: "forge"
+    url: "ssh://127.0.0.1:22"
+    interval: "1m"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-forgejo-uds"
+
+  - name: "semaphore"
+    group: "forge"
+    url: "http://127.0.0.1:3015/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "cockpit"
+    group: "forge"
+    url: "tcp://127.0.0.1:9090"
+    interval: "1m"
+    conditions:
+      - "[CONNECTED] == true"
+
+  - name: "amp"
+    group: "forge"
+    url: "http://127.0.0.1:8085/"
+    interval: "1m"
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: "restic-backup-tier-a"
+    group: "storage"
+    url: "ssh://127.0.0.1:22"
+    interval: "1h"
+    conditions:
+      - "[CONNECTED] == true"
+      - "[STATUS] == 0"
+      - "[BODY] == OK*"
+    ssh:
+      username: "monitoring"
+      private-key: "/run/secrets/gatus_ssh_key"
+      body:
+        command: "/run/current-system/sw/bin/check-restic-backup"
