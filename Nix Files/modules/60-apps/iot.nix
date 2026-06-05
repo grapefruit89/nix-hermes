@@ -94,83 +94,89 @@ in
     })
 
     (lib.mkIf cfgZigbee.enable {
-      services.mosquitto = {
-        enable = true;
-        listeners = [{
-          port = cfgZigbee.mqttPort;
-          address = "127.0.0.1";
-          acl = [ "pattern readwrite #" ];
-          settings.allow_anonymous = false;
-          users = {
-            "zigbee2mqtt" = {
-              hashedPasswordFile = "/var/lib/secrets/mosquitto_password";
+      services = {
+        mosquitto = {
+          enable = true;
+          listeners = [{
+            port = cfgZigbee.mqttPort;
+            address = "127.0.0.1";
+            acl = [ "pattern readwrite #" ];
+            settings.allow_anonymous = false;
+            users = {
+              "zigbee2mqtt" = {
+                hashedPasswordFile = "/var/lib/secrets/mosquitto_password";
+              };
+            };
+          }];
+        };
+
+        zigbee2mqtt = {
+          enable = true;
+          inherit (cfgZigbee) dataDir;
+          settings = {
+            homeassistant = { enabled = true; };
+            permit_join = false;
+            mqtt = {
+              base_topic = "zigbee2mqtt";
+              server = "mqtt://127.0.0.1:${toString cfgZigbee.mqttPort}";
+            };
+            serial = {
+              port = cfgZigbee.zigbeeDevice;
+              inherit (cfgZigbee) adapter;
+            };
+            frontend = {
+              port = cfgZigbee.zigbeePort;
+              host = "127.0.0.1";
+            };
+            advanced = {
+              log_directory = "${cfgZigbee.dataDir}/log";
+              pan_id = 6699;
             };
           };
-        }];
-      };
+        };
 
-      systemd.services.mosquitto.serviceConfig = {
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        PrivateTmp = true;
-        NoNewPrivileges = true;
-        ReadWritePaths = [ "/var/lib/mosquitto" ];
-        OOMScoreAdjust = -100;
-      };
-
-      services.zigbee2mqtt = {
-        enable = true;
-        inherit (cfgZigbee) dataDir;
-        settings = {
-          homeassistant = { enabled = true; };
-          permit_join = false;
-          mqtt = {
-            base_topic = "zigbee2mqtt";
-            server = "mqtt://127.0.0.1:${toString cfgZigbee.mqttPort}";
-          };
-          serial = {
-            port = cfgZigbee.zigbeeDevice;
-            inherit (cfgZigbee) adapter;
-          };
-          frontend = {
-            port = cfgZigbee.zigbeePort;
-            host = "127.0.0.1";
-          };
-          advanced = {
-            log_directory = "${cfgZigbee.dataDir}/log";
-            pan_id = 6699;
-          };
+        caddy.virtualHosts."zigbee.${domain}" = {
+          extraConfig = ''
+            import security_headers
+            reverse_proxy 127.0.0.1:${toString cfgZigbee.zigbeePort}
+          '';
         };
       };
 
-      systemd.services.zigbee2mqtt = {
-        after = [ "mosquitto.service" ];
-        wants = [ "mosquitto.service" ];
-        serviceConfig = {
-          ProtectSystem = "strict";
-          ProtectHome = true;
-          PrivateTmp = true;
-          NoNewPrivileges = true;
-          PrivateDevices = lib.mkForce (if (lib.hasPrefix "/dev/" cfgZigbee.zigbeeDevice) then false else true);
-          DeviceAllow = lib.optional (lib.hasPrefix "/dev/" cfgZigbee.zigbeeDevice) "${cfgZigbee.zigbeeDevice} rw";
-          RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
-        };
-      };
+      systemd = {
+        services = {
+          mosquitto.serviceConfig = {
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+            NoNewPrivileges = true;
+            ReadWritePaths = [ "/var/lib/mosquitto" ];
+            OOMScoreAdjust = -100;
+          };
 
-      systemd.tmpfiles.rules = [
-        "d ${cfgZigbee.dataDir} 0750 zigbee2mqtt mqtt -"
-        "d /var/lib/mosquitto 0750 mosquitto mqtt -"
-      ];
+          zigbee2mqtt = {
+            after = [ "mosquitto.service" ];
+            wants = [ "mosquitto.service" ];
+            serviceConfig = {
+              ProtectSystem = "strict";
+              ProtectHome = true;
+              PrivateTmp = true;
+              NoNewPrivileges = true;
+              PrivateDevices = lib.mkForce (if (lib.hasPrefix "/dev/" cfgZigbee.zigbeeDevice) then false else true);
+              DeviceAllow = lib.optional (lib.hasPrefix "/dev/" cfgZigbee.zigbeeDevice) "${cfgZigbee.zigbeeDevice} rw";
+              RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+            };
+          };
+        };
+
+        tmpfiles.rules = [
+          "d ${cfgZigbee.dataDir} 0750 zigbee2mqtt mqtt -"
+          "d /var/lib/mosquitto 0750 mosquitto mqtt -"
+        ];
+      };
 
       users.users.zigbee2mqtt.extraGroups = [ "mqtt" "dialout" ];
       users.users.mosquitto.extraGroups = [ "mqtt" ];
-
-      services.caddy.virtualHosts."zigbee.${domain}" = {
-        extraConfig = ''
-          import security_headers
-          reverse_proxy 127.0.0.1:${toString cfgZigbee.zigbeePort}
-        '';
-      };
     })
   ];
 }

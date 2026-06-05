@@ -39,71 +39,73 @@ in
   # ============================================================================
   # OPTIONS
   # ============================================================================
-  options.my.core = {
-    boot-safeguard.enable = lib.mkEnableOption "Boot safeguard generation limits";
-    kernel-slim.enable = lib.mkEnableOption "Fujitsu Q958 kernel slimming (saves ~300MB RAM)";
-    nix-tuning.enable = lib.mkEnableOption "Nix store performance tuning and GC";
-    zram-swap.enable = lib.mkEnableOption "Aggressive komprimierter ZRAM RAM-swap";
-  };
+  options.my = {
+    core = {
+      boot-safeguard.enable = lib.mkEnableOption "Boot safeguard generation limits";
+      kernel-slim.enable = lib.mkEnableOption "Fujitsu Q958 kernel slimming (saves ~300MB RAM)";
+      nix-tuning.enable = lib.mkEnableOption "Nix store performance tuning and GC";
+      zram-swap.enable = lib.mkEnableOption "Aggressive komprimierter ZRAM RAM-swap";
+    };
 
-  options.my.mode = lib.mkOption {
-    type = lib.types.enum [ "development" "production" ];
-    default = "development";
-    description = "Overall system mode: development (open) or production (hardened)";
-  };
+    mode = lib.mkOption {
+      type = lib.types.enum [ "development" "production" ];
+      default = "development";
+      description = "Overall system mode: development (open) or production (hardened)";
+    };
 
-  options.my.configs = {
-    identity = {
-      user = lib.mkOption { type = lib.types.str; default = "moritz"; description = "Primary user name."; };
-      domain = lib.mkOption { type = lib.types.str; default = "m7c5.de"; description = "Primary domain."; };
+    configs = {
+      identity = {
+        user = lib.mkOption { type = lib.types.str; default = "moritz"; description = "Primary user name."; };
+        domain = lib.mkOption { type = lib.types.str; default = "m7c5.de"; description = "Primary domain."; };
+      };
+      locale = {
+        default = lib.mkOption { type = lib.types.str; default = "de_DE.UTF-8"; description = "System-wide default locale."; };
+        language = lib.mkOption { type = lib.types.str; default = "de"; description = "System-wide keyboard layout and language code."; };
+        timezone = lib.mkOption { type = lib.types.str; default = "Europe/Berlin"; description = "System-wide timezone."; };
+      };
+      hardware = {
+        ramGB = lib.mkOption { type = lib.types.int; default = 16; description = "Installed RAM in GB."; };
+      };
+      server = {
+        lanIP = lib.mkOption { type = lib.types.str; default = "192.168.1.100"; description = "Server LAN IP address."; };
+        tailscaleIP = lib.mkOption { type = lib.types.str; default = "100.64.0.1"; description = "Server Tailscale IP address."; };
+      };
+      network = {
+        dnsDoH = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ "https://dns.cloudflare.com/dns-query" ]; description = "List of upstream DNS DoH endpoints."; };
+        dnsBootstrap = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ "1.1.1.1" ]; description = "List of bootstrap DNS IPs."; };
+        dnsFallback = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ "1.1.1.1" ]; description = "List of fallback DNS IPs."; };
+      };
     };
-    locale = {
-      default = lib.mkOption { type = lib.types.str; default = "de_DE.UTF-8"; description = "System-wide default locale."; };
-      language = lib.mkOption { type = lib.types.str; default = "de"; description = "System-wide keyboard layout and language code."; };
-      timezone = lib.mkOption { type = lib.types.str; default = "Europe/Berlin"; description = "System-wide timezone."; };
-    };
-    hardware = {
-      ramGB = lib.mkOption { type = lib.types.int; default = 16; description = "Installed RAM in GB."; };
-    };
-    server = {
-      lanIP = lib.mkOption { type = lib.types.str; default = "192.168.1.100"; description = "Server LAN IP address."; };
-      tailscaleIP = lib.mkOption { type = lib.types.str; default = "100.64.0.1"; description = "Server Tailscale IP address."; };
-    };
-    network = {
-      dnsDoH = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ "https://dns.cloudflare.com/dns-query" ]; description = "List of upstream DNS DoH endpoints."; };
-      dnsBootstrap = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ "1.1.1.1" ]; description = "List of bootstrap DNS IPs."; };
-      dnsFallback = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ "1.1.1.1" ]; description = "List of fallback DNS IPs."; };
-    };
-  };
 
-  options.my.ports = {
-    adguard = lib.mkOption { type = lib.types.port; default = 3053; description = "AdGuard Home port."; };
-    valkey = lib.mkOption { type = lib.types.port; default = 6379; description = "Valkey cache port."; };
-    ssh = lib.mkOption { type = lib.types.port; default = 53844; description = "SSH port."; };
-    jellyfin = lib.mkOption { type = lib.types.port; default = 8096; description = "Jellyfin port."; };
-    jellyseerr = lib.mkOption { type = lib.types.port; default = 5055; description = "Jellyseerr port."; };
-    sonarr = lib.mkOption { type = lib.types.port; default = 8989; description = "Sonarr port."; };
-    radarr = lib.mkOption { type = lib.types.port; default = 7878; description = "Radarr port."; };
-    readarr = lib.mkOption { type = lib.types.port; default = 8787; description = "Readarr port."; };
-    prowlarr = lib.mkOption { type = lib.types.port; default = 9696; description = "Prowlarr port."; };
-    sabnzbd = lib.mkOption { type = lib.types.port; default = 8080; description = "SABnzbd port."; };
-    vaultwarden = lib.mkOption { type = lib.types.port; default = 8000; description = "Vaultwarden port."; };
-    homepage = lib.mkOption { type = lib.types.port; default = 8082; description = "Homepage port."; };
-    mqtt = lib.mkOption { type = lib.types.port; default = 1883; description = "MQTT broker port."; };
-    zigbee2mqtt = lib.mkOption { type = lib.types.port; default = 8075; description = "Zigbee2MQTT frontend port."; };
-    pocket-id = lib.mkOption { type = lib.types.port; default = 8083; description = "PocketID port."; };
-    paperless = lib.mkOption { type = lib.types.port; default = 28981; description = "Paperless-ngx port."; };
-    n8n = lib.mkOption { type = lib.types.port; default = 5678; description = "n8n port."; };
-    filebrowser = lib.mkOption { type = lib.types.port; default = 20001; description = "Filebrowser port."; };
-    linkwarden = lib.mkOption { type = lib.types.port; default = 3000; description = "Linkwarden port."; };
-    open-webui = lib.mkOption { type = lib.types.port; default = 3080; description = "Open WebUI port."; };
-    forgejo = lib.mkOption { type = lib.types.port; default = 3010; description = "Forgejo HTTP port."; };
-    semaphore = lib.mkOption { type = lib.types.port; default = 3015; description = "Semaphore HTTP port."; };
-    cockpit = lib.mkOption { type = lib.types.port; default = 9090; description = "Cockpit admin port."; };
-    amp = lib.mkOption { type = lib.types.port; default = 8085; description = "AMP Web UI port."; };
-    gatus = lib.mkOption { type = lib.types.port; default = 8084; description = "Gatus Web UI port."; };
-    loki = lib.mkOption { type = lib.types.port; default = 3100; description = "Loki API port."; };
-    grafana = lib.mkOption { type = lib.types.port; default = 3005; description = "Grafana Web UI port."; };
+    ports = {
+      adguard = lib.mkOption { type = lib.types.port; default = 3053; description = "AdGuard Home port."; };
+      valkey = lib.mkOption { type = lib.types.port; default = 6379; description = "Valkey cache port."; };
+      ssh = lib.mkOption { type = lib.types.port; default = 53844; description = "SSH port."; };
+      jellyfin = lib.mkOption { type = lib.types.port; default = 8096; description = "Jellyfin port."; };
+      jellyseerr = lib.mkOption { type = lib.types.port; default = 5055; description = "Jellyseerr port."; };
+      sonarr = lib.mkOption { type = lib.types.port; default = 8989; description = "Sonarr port."; };
+      radarr = lib.mkOption { type = lib.types.port; default = 7878; description = "Radarr port."; };
+      readarr = lib.mkOption { type = lib.types.port; default = 8787; description = "Readarr port."; };
+      prowlarr = lib.mkOption { type = lib.types.port; default = 9696; description = "Prowlarr port."; };
+      sabnzbd = lib.mkOption { type = lib.types.port; default = 8080; description = "SABnzbd port."; };
+      vaultwarden = lib.mkOption { type = lib.types.port; default = 8000; description = "Vaultwarden port."; };
+      homepage = lib.mkOption { type = lib.types.port; default = 8082; description = "Homepage port."; };
+      mqtt = lib.mkOption { type = lib.types.port; default = 1883; description = "MQTT broker port."; };
+      zigbee2mqtt = lib.mkOption { type = lib.types.port; default = 8075; description = "Zigbee2MQTT frontend port."; };
+      pocket-id = lib.mkOption { type = lib.types.port; default = 8083; description = "PocketID port."; };
+      paperless = lib.mkOption { type = lib.types.port; default = 28981; description = "Paperless-ngx port."; };
+      n8n = lib.mkOption { type = lib.types.port; default = 5678; description = "n8n port."; };
+      filebrowser = lib.mkOption { type = lib.types.port; default = 20001; description = "Filebrowser port."; };
+      linkwarden = lib.mkOption { type = lib.types.port; default = 3000; description = "Linkwarden port."; };
+      open-webui = lib.mkOption { type = lib.types.port; default = 3080; description = "Open WebUI port."; };
+      forgejo = lib.mkOption { type = lib.types.port; default = 3010; description = "Forgejo HTTP port."; };
+      semaphore = lib.mkOption { type = lib.types.port; default = 3015; description = "Semaphore HTTP port."; };
+      cockpit = lib.mkOption { type = lib.types.port; default = 9090; description = "Cockpit admin port."; };
+      amp = lib.mkOption { type = lib.types.port; default = 8085; description = "AMP Web UI port."; };
+      gatus = lib.mkOption { type = lib.types.port; default = 8084; description = "Gatus Web UI port."; };
+      loki = lib.mkOption { type = lib.types.port; default = 3100; description = "Loki API port."; };
+      grafana = lib.mkOption { type = lib.types.port; default = 3005; description = "Grafana Web UI port."; };
+    };
   };
 
   # ============================================================================

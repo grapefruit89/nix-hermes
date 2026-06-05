@@ -8,15 +8,19 @@
 { config, pkgs, ... }:
 
 {
-  home.username = "freund";
-  home.homeDirectory = "/home/freund";
+  home = {
+    username = "freund";
+    homeDirectory = "/home/freund";
 
-  # --- User Packages ---
-  home.packages = with pkgs; [
-    htop
-    git
-    # ... weitere CLI Tools
-  ];
+    # --- User Packages ---
+    packages = with pkgs; [
+      htop
+      git
+      # ... weitere CLI Tools
+    ];
+
+    stateVersion = "23.11";
+  };
 
   # --- Program Configs ---
   programs.git = {
@@ -27,5 +31,4 @@
 
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
-  home.stateVersion = "23.11";
 }

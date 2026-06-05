@@ -31,11 +31,15 @@ in
     };
 
     # GID/UID und Gruppen-Anpassung
-    users.groups.media = { };
-    users.groups.sabnzbd.gid = lib.mkDefault 194;
-    users.users.sabnzbd = {
-      uid = lib.mkDefault 984;
-      extraGroups = [ "media" ];
+    users = {
+      groups = {
+        media = { };
+        sabnzbd.gid = lib.mkDefault 194;
+      };
+      users.sabnzbd = {
+        uid = lib.mkDefault 984;
+        extraGroups = [ "media" ];
+      };
     };
 
     systemd.services.sabnzbd = {

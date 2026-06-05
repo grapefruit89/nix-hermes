@@ -37,8 +37,8 @@ in
   # ============================================================================
   # OPTIONS
   # ============================================================================
-  options = {
-    my.services.gatus = {
+  options.my = {
+    services.gatus = {
       enable = lib.mkEnableOption "Gatus status and health monitoring dashboard";
       port = lib.mkOption {
         type = lib.types.port;
@@ -52,7 +52,7 @@ in
       };
     };
 
-    my.observability = {
+    observability = {
       enable = lib.mkEnableOption "Vector + Loki + Grafana centralized logging stack";
       lokiPort = lib.mkOption {
         type = lib.types.port;
@@ -66,7 +66,7 @@ in
       };
     };
 
-    my.security.crowdsec = {
+    security.crowdsec = {
       enable = lib.mkEnableOption "CrowdSec security engine and nftables firewall bouncer";
     };
   };
@@ -258,28 +258,30 @@ in
         '')
       ];
 
-      services.openssh.extraConfig = ''
-        Match User monitoring
-          ForceCommand /run/current-system/sw/bin/gatus-ssh-wrapper
-          AllowTcpForwarding no
-          X11Forwarding no
-          AllowAgentForwarding no
-          AuthorizedKeysFile .ssh/authorized_keys
-      '';
-
-      services.gatus = {
-        enable = true;
-        settings = {
-          web.address = "127.0.0.1";
-          web.port = cfgGatus.port;
-        };
-      };
-
-      services.caddy.virtualHosts."gatus.${domain}" = {
-        extraConfig = ''
-          import sso_auth
-          reverse_proxy 127.0.0.1:${toString cfgGatus.port}
+      services = {
+        openssh.extraConfig = ''
+          Match User monitoring
+            ForceCommand /run/current-system/sw/bin/gatus-ssh-wrapper
+            AllowTcpForwarding no
+            X11Forwarding no
+            AllowAgentForwarding no
+            AuthorizedKeysFile .ssh/authorized_keys
         '';
+
+        gatus = {
+          enable = true;
+          settings = {
+            web.address = "127.0.0.1";
+            web.port = cfgGatus.port;
+          };
+        };
+
+        caddy.virtualHosts."gatus.${domain}" = {
+          extraConfig = ''
+            import sso_auth
+            reverse_proxy 127.0.0.1:${toString cfgGatus.port}
+          '';
+        };
       };
 
       systemd.services.gatus = {
@@ -307,172 +309,176 @@ in
 
     # ─── SECTION 2: OBSERVABILITY (LOKI + VECTOR + GRAFANA) ───────────────────
     (lib.mkIf cfgObs.enable {
-      services.loki = {
-        enable = true;
-        configFile = pkgs.writeText "loki-config.yaml" ''
-          auth_enabled: false
-          server:
-            http_listen_port: ${toString cfgObs.lokiPort}
-            grpc_listen_port: 9095
-          common:
-            instance_addr: 127.0.0.1
-            path_prefix: /var/lib/loki
-            storage:
-              filesystem:
-                chunks_directory: /var/lib/loki/chunks
-                rules_directory: /var/lib/loki/rules
-            replication_factor: 1
-            ring:
-              kvstore:
-                store: inmemory
-          limits_config:
-            reject_old_samples: true
-            reject_old_samples_max_age: 168h
-            creation_grace_period: 10m
-            retention_period: 168h
-          compactor:
-            working_directory: /var/lib/loki/compactor
-            compaction_interval: 10m
-            retention_enabled: true
-            retention_delete_delay: 2h
-            retention_delete_worker_count: 150
-          schema_config:
-            configs:
-              - from: 2026-01-01
-                store: tsdb
-                object_store: filesystem
-                schema: v13
-                index:
-                  prefix: index_
-                  period: 24h
-        '';
-      };
+      services = {
+        loki = {
+          enable = true;
+          configFile = pkgs.writeText "loki-config.yaml" ''
+            auth_enabled: false
+            server:
+              http_listen_port: ${toString cfgObs.lokiPort}
+              grpc_listen_port: 9095
+            common:
+              instance_addr: 127.0.0.1
+              path_prefix: /var/lib/loki
+              storage:
+                filesystem:
+                  chunks_directory: /var/lib/loki/chunks
+                  rules_directory: /var/lib/loki/rules
+              replication_factor: 1
+              ring:
+                kvstore:
+                  store: inmemory
+            limits_config:
+              reject_old_samples: true
+              reject_old_samples_max_age: 168h
+              creation_grace_period: 10m
+              retention_period: 168h
+            compactor:
+              working_directory: /var/lib/loki/compactor
+              compaction_interval: 10m
+              retention_enabled: true
+              retention_delete_delay: 2h
+              retention_delete_worker_count: 150
+            schema_config:
+              configs:
+                - from: 2026-01-01
+                  store: tsdb
+                  object_store: filesystem
+                  schema: v13
+                  index:
+                    prefix: index_
+                    period: 24h
+          '';
+        };
 
-      systemd.services.loki.serviceConfig = {
-        ProtectSystem = lib.mkForce "strict";
-        ProtectHome = true;
-        PrivateTmp = true;
-        PrivateDevices = true;
-        ProtectKernelTunables = true;
-        ProtectKernelModules = true;
-        ProtectControlGroups = true;
-        NoNewPrivileges = true;
-        MemoryDenyWriteExecute = true;
-        DevicePolicy = "closed";
-        CapabilityBoundingSet = "";
-        ReadWritePaths = [ "/var/lib/loki" ];
-      };
-
-      services.vector = {
-        enable = true;
-        journaldAccess = true;
-        settings = {
-          sources = {
-            journald_source = {
-              type = "journald";
-              exclude_units = [ "vector.service" ];
+        vector = {
+          enable = true;
+          journaldAccess = true;
+          settings = {
+            sources = {
+              journald_source = {
+                type = "journald";
+                exclude_units = [ "vector.service" ];
+              };
             };
-          };
-          transforms = {
-            caddy_parse = {
-              type = "remap";
-              inputs = [ "journald_source" ];
-              source = ''
-                if .SYSLOG_IDENTIFIER == "caddy" {
-                  parsed, err = parse_json(.message)
-                  if err == null {
-                    .caddy = parsed
-                    .source = "caddy"
-                    .level = if .caddy.status >= 500 { "error" } else if .caddy.status >= 400 { "warn" } else { "info" }
+            transforms = {
+              caddy_parse = {
+                type = "remap";
+                inputs = [ "journald_source" ];
+                source = ''
+                  if .SYSLOG_IDENTIFIER == "caddy" {
+                    parsed, err = parse_json(.message)
+                    if err == null {
+                      .caddy = parsed
+                      .source = "caddy"
+                      .level = if .caddy.status >= 500 { "error" } else if .caddy.status >= 400 { "warn" } else { "info" }
+                    } else {
+                      .source = "caddy-system"
+                      .level = "info"
+                    }
                   } else {
-                    .source = "caddy-system"
-                    .level = "info"
+                    .source = downcase(.SYSLOG_IDENTIFIER || "system")
+                    .level = downcase(.PRIORITY || "info")
                   }
-                } else {
-                  .source = downcase(.SYSLOG_IDENTIFIER || "system")
-                  .level = downcase(.PRIORITY || "info")
-                }
-                .host = "${config.networking.hostName}"
-              '';
+                  .host = "${config.networking.hostName}"
+                '';
+              };
             };
-          };
-          sinks = {
-            loki_sink = {
-              type = "loki";
-              inputs = [ "caddy_parse" ];
-              endpoint = "http://127.0.0.1:${toString cfgObs.lokiPort}";
-              encoding.codec = "json";
-              labels = {
-                source = "{{ source }}";
-                level = "{{ level }}";
-                host = "{{ host }}";
+            sinks = {
+              loki_sink = {
+                type = "loki";
+                inputs = [ "caddy_parse" ];
+                endpoint = "http://127.0.0.1:${toString cfgObs.lokiPort}";
+                encoding.codec = "json";
+                labels = {
+                  source = "{{ source }}";
+                  level = "{{ level }}";
+                  host = "{{ host }}";
+                };
               };
             };
           };
         };
-      };
 
-      systemd.services.vector.serviceConfig = {
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        PrivateTmp = true;
-        PrivateDevices = true;
-        ProtectKernelTunables = true;
-        ProtectKernelModules = true;
-        ProtectControlGroups = true;
-        NoNewPrivileges = true;
-        MemoryDenyWriteExecute = true;
-        DevicePolicy = "closed";
-        CapabilityBoundingSet = "";
-        ReadWritePaths = [ "/var/lib/vector" ];
-      };
-
-      services.grafana = {
-        enable = true;
-        settings = {
-          server = {
-            http_addr = "127.0.0.1";
-            http_port = cfgObs.grafanaPort;
-            domain = "grafana.${domain}";
-          };
-          security = {
-            secret_key = "SW2YcwTIb9zpOOhoPsMm";
-          };
-        };
-        provision = {
+        grafana = {
           enable = true;
-          datasources.settings.datasources = [
-            {
-              name = "Loki";
-              type = "loki";
-              access = "proxy";
-              url = "http://127.0.0.1:${toString cfgObs.lokiPort}";
-              isDefault = true;
-            }
-          ];
+          settings = {
+            server = {
+              http_addr = "127.0.0.1";
+              http_port = cfgObs.grafanaPort;
+              domain = "grafana.${domain}";
+            };
+            security = {
+              secret_key = "SW2YcwTIb9zpOOhoPsMm";
+            };
+          };
+          provision = {
+            enable = true;
+            datasources.settings.datasources = [
+              {
+                name = "Loki";
+                type = "loki";
+                access = "proxy";
+                url = "http://127.0.0.1:${toString cfgObs.lokiPort}";
+                isDefault = true;
+              }
+            ];
+          };
+        };
+
+        caddy.virtualHosts."grafana.${domain}" = {
+          extraConfig = ''
+            import sso_auth
+            reverse_proxy 127.0.0.1:${toString cfgObs.grafanaPort}
+          '';
         };
       };
 
-      systemd.services.grafana.serviceConfig = {
-        ProtectSystem = lib.mkForce "strict";
-        ProtectHome = true;
-        PrivateTmp = true;
-        PrivateDevices = true;
-        ProtectKernelTunables = true;
-        ProtectKernelModules = true;
-        ProtectControlGroups = true;
-        NoNewPrivileges = true;
-        MemoryDenyWriteExecute = true;
-        DevicePolicy = "closed";
-        CapabilityBoundingSet = "";
-        ReadWritePaths = [ "/var/lib/grafana" ];
-      };
+      systemd.services = {
+        loki.serviceConfig = {
+          ProtectSystem = lib.mkForce "strict";
+          ProtectHome = true;
+          PrivateTmp = true;
+          PrivateDevices = true;
+          ProtectKernelTunables = true;
+          ProtectKernelModules = true;
+          ProtectControlGroups = true;
+          NoNewPrivileges = true;
+          MemoryDenyWriteExecute = true;
+          DevicePolicy = "closed";
+          CapabilityBoundingSet = "";
+          ReadWritePaths = [ "/var/lib/loki" ];
+        };
 
-      services.caddy.virtualHosts."grafana.${domain}" = {
-        extraConfig = ''
-          import sso_auth
-          reverse_proxy 127.0.0.1:${toString cfgObs.grafanaPort}
-        '';
+        vector.serviceConfig = {
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          PrivateTmp = true;
+          PrivateDevices = true;
+          ProtectKernelTunables = true;
+          ProtectKernelModules = true;
+          ProtectControlGroups = true;
+          NoNewPrivileges = true;
+          MemoryDenyWriteExecute = true;
+          DevicePolicy = "closed";
+          CapabilityBoundingSet = "";
+          ReadWritePaths = [ "/var/lib/vector" ];
+        };
+
+        grafana.serviceConfig = {
+          ProtectSystem = lib.mkForce "strict";
+          ProtectHome = true;
+          PrivateTmp = true;
+          PrivateDevices = true;
+          ProtectKernelTunables = true;
+          ProtectKernelModules = true;
+          ProtectControlGroups = true;
+          NoNewPrivileges = true;
+          MemoryDenyWriteExecute = true;
+          DevicePolicy = "closed";
+          CapabilityBoundingSet = "";
+          ReadWritePaths = [ "/var/lib/grafana" ];
+        };
       };
     })
 

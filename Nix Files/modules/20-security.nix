@@ -157,74 +157,73 @@ in
   config = lib.mkMerge [
     # ── SOVEREIGN UNLOCK CASCADE ──────────────────────────────────────────────
     (lib.mkIf cfgUnlock.enable {
-      boot.initrd.systemd.enable = true;
+      boot = {
+        initrd = {
+          systemd.enable = true;
 
-      # LUKS2 Container mit TPM2.0 und FIDO2 Bindung
-      boot.initrd.luks.devices."sovereign_vault" = {
-        device = cfgUnlock.luksDevice;
-        crypttabExtraOpts = [
-          "tpm2-device=auto"
-          "tpm2-pcrs=0+1+7"
-          "fido2-device=auto"
-          "fido2-with-client-pin=false"
-        ];
-      };
+          luks.devices."sovereign_vault" = {
+            device = cfgUnlock.luksDevice;
+            crypttabExtraOpts = [
+              "tpm2-device=auto"
+              "tpm2-pcrs=0+1+7"
+              "fido2-device=auto"
+              "fido2-with-client-pin=false"
+            ];
+          };
 
-      # Clevis-Tang Bindung im Heimnetzwerk
-      boot.initrd.clevis = lib.mkIf (cfgUnlock.tangServer != "") {
-        enable = true;
-        devices."sovereign_vault".secretFile = "/run/nms-network-trusted";
-      };
+          clevis = lib.mkIf (cfgUnlock.tangServer != "") {
+            enable = true;
+            devices."sovereign_vault".secretFile = "/run/nms-network-trusted";
+          };
 
-      # Initrd SSH (Dropbear) auf Port 2222 für Smartphone-Unlock
-      boot.initrd.network = {
-        enable = true;
-        ssh = lib.mkIf (cfgUnlock.authorizedKeys != [ ]) {
-          enable = true;
-          port = cfgUnlock.sshPort;
-          inherit (cfgUnlock) authorizedKeys;
-          hostKeys = [ cfgUnlock.hostKey ];
-          shell = "${pkgs.writeShellScript "initrd-unlock-shell" ''
-            echo "NMS v4.2 - Remote initrd Unlock Shell"
-            echo "Unlock command: systemd-tty-ask-password-agent"
-            exec ${pkgs.bashInteractive}/bin/bash
-          ''}";
+          network = {
+            enable = true;
+            ssh = lib.mkIf (cfgUnlock.authorizedKeys != [ ]) {
+              enable = true;
+              port = cfgUnlock.sshPort;
+              inherit (cfgUnlock) authorizedKeys;
+              hostKeys = [ cfgUnlock.hostKey ];
+              shell = "${pkgs.writeShellScript "initrd-unlock-shell" ''
+                echo "NMS v4.2 - Remote initrd Unlock Shell"
+                echo "Unlock command: systemd-tty-ask-password-agent"
+                exec ${pkgs.bashInteractive}/bin/bash
+              ''}";
+            };
+          };
+
+          systemd.services.nms-qr-fallback = {
+            description = "NMS Emergency TTY QR-Code Fallback";
+            wantedBy = [ "initrd.target" ];
+            serviceConfig = {
+              Type = "oneshot";
+              ExecStart = qrFallbackScript;
+              RemainAfterExit = false;
+            };
+          };
+
+          availableKernelModules = [
+            "xhci_pci"
+            "ehci_pci"
+            "xhci_hcd"
+            "usb_storage"
+            "uas"
+            "r8169"
+            "e1000e"
+            "igb"
+            "ixgbe"
+            "tg3"
+            "atlantic"
+            "r8152"
+            "ax88179_178a"
+            "cdc_ether"
+            "tpm_tis"
+            "tpm_crb"
+            "tpm_tis_core"
+            "dm_crypt"
+            "aes"
+          ];
         };
       };
-
-      # QR-Code TTY Fallback Service
-      boot.initrd.systemd.services.nms-qr-fallback = {
-        description = "NMS Emergency TTY QR-Code Fallback";
-        wantedBy = [ "initrd.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          ExecStart = qrFallbackScript;
-          RemainAfterExit = false;
-        };
-      };
-
-      # Disaster Recovery Kernel-Module für universelle Hardware-Abdeckung
-      boot.initrd.availableKernelModules = [
-        "xhci_pci"
-        "ehci_pci"
-        "xhci_hcd"
-        "usb_storage"
-        "uas"
-        "r8169"
-        "e1000e"
-        "igb"
-        "ixgbe"
-        "tg3"
-        "atlantic"
-        "r8152"
-        "ax88179_178a"
-        "cdc_ether"
-        "tpm_tis"
-        "tpm_crb"
-        "tpm_tis_core"
-        "dm_crypt"
-        "aes"
-      ];
 
       assertions = [{
         assertion = cfgUnlock.authorizedKeys != [ ] || cfgUnlock.tangServer != "";

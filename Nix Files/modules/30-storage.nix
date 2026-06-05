@@ -104,54 +104,56 @@ in
       };
     };
 
-    services.storage = {
-      enable = lib.mkEnableOption "Hybrid MergerFS & ext4 pool pool config";
-      poolMountPoint = lib.mkOption {
-        type = lib.types.str;
-        default = "/mnt/media";
-        description = "Shared virtual folder pool target.";
+    services = {
+      storage = {
+        enable = lib.mkEnableOption "Hybrid MergerFS & ext4 pool pool config";
+        poolMountPoint = lib.mkOption {
+          type = lib.types.str;
+          default = "/mnt/media";
+          description = "Shared virtual folder pool target.";
+        };
       };
-    };
 
-    services.storage-mover = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = config.my.services.storage.enable;
-        description = "Enable Precision Storage Cache Mover (rclone local engine).";
+      storage-mover = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = config.my.services.storage.enable;
+          description = "Enable Precision Storage Cache Mover (rclone local engine).";
+        };
+        sourceDir = lib.mkOption {
+          type = lib.types.str;
+          default = "/mnt/fast_pool/downloads";
+          description = "SSD cache source directory (Tier B).";
+        };
+        targetDir = lib.mkOption {
+          type = lib.types.str;
+          default = "/mnt/media/downloads";
+          description = "HDD pool target directory (Tier C).";
+        };
+        minAge = lib.mkOption {
+          type = lib.types.str;
+          default = "30d";
+          description = "Minimum file age before migration (rclone format, e.g., 30d).";
+        };
+        capacityThreshold = lib.mkOption {
+          type = lib.types.int;
+          default = 85;
+          description = "Cache disk capacity percentage that forces migration regardless of HDD state.";
+        };
+        onCalendar = lib.mkOption {
+          type = lib.types.str;
+          default = "*-*-* 03:00:00";
+          description = "Execution cron-style trigger interval.";
+        };
       };
-      sourceDir = lib.mkOption {
-        type = lib.types.str;
-        default = "/mnt/fast_pool/downloads";
-        description = "SSD cache source directory (Tier B).";
-      };
-      targetDir = lib.mkOption {
-        type = lib.types.str;
-        default = "/mnt/media/downloads";
-        description = "HDD pool target directory (Tier C).";
-      };
-      minAge = lib.mkOption {
-        type = lib.types.str;
-        default = "30d";
-        description = "Minimum file age before migration (rclone format, e.g., 30d).";
-      };
-      capacityThreshold = lib.mkOption {
-        type = lib.types.int;
-        default = 85;
-        description = "Cache disk capacity percentage that forces migration regardless of HDD state.";
-      };
-      onCalendar = lib.mkOption {
-        type = lib.types.str;
-        default = "*-*-* 03:00:00";
-        description = "Execution cron-style trigger interval.";
-      };
-    };
 
-    services.restic-backup = {
-      enable = lib.mkEnableOption "Restic offsite S3 backup schedule";
-      healthcheckUrl = lib.mkOption {
-        type = lib.types.str;
-        default = "";
-        description = "Dead Man's Switch heartbeat URL.";
+      restic-backup = {
+        enable = lib.mkEnableOption "Restic offsite S3 backup schedule";
+        healthcheckUrl = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Dead Man's Switch heartbeat URL.";
+        };
       };
     };
   };
@@ -212,98 +214,99 @@ in
       boot.supportedFilesystems = [ "ext4" ];
 
       # Pooling mounts
-      # Pool for Tier B (Slower SSDs, Caches, Downloads)
-      fileSystems."/mnt/fast_pool" = {
-        device = "mergerfs";
-        fsType = "fuse.mergerfs";
-        options = [
-          "defaults"
-          "allow_other"
-          "minfreespace=10G"
-          "category.create=mfs"
-          "branches=/mnt/tier-b/*"
-        ];
-      };
+      fileSystems = {
+        "/mnt/fast_pool" = {
+          device = "mergerfs";
+          fsType = "fuse.mergerfs";
+          options = [
+            "defaults"
+            "allow_other"
+            "minfreespace=10G"
+            "category.create=mfs"
+            "branches=/mnt/tier-b/*"
+          ];
+        };
 
-      # Pool for Tier C (HDDs, Cold Storage)
-      fileSystems."${cfgStorage.poolMountPoint}" = {
-        device = "mergerfs";
-        fsType = "fuse.mergerfs";
-        # category.create=epmfs: distributes files across Tier C drives
-        # minfreespace=50G: avoids drive overflow
-        # dropcacheonclose=true: enables fast HDD spindown via hd-idle
-        options = [
-          "defaults"
-          "allow_other"
-          "category.create=epmfs"
-          "minfreespace=50G"
-          "dropcacheonclose=true"
-          "branches=/mnt/tier-c/*"
-        ];
-      };
+        "${cfgStorage.poolMountPoint}" = {
+          device = "mergerfs";
+          fsType = "fuse.mergerfs";
+          # category.create=epmfs: distributes files across Tier C drives
+          # minfreespace=50G: avoids drive overflow
+          # dropcacheonclose=true: enables fast HDD spindown via hd-idle
+          options = [
+            "defaults"
+            "allow_other"
+            "category.create=epmfs"
+            "minfreespace=50G"
+            "dropcacheonclose=true"
+            "branches=/mnt/tier-c/*"
+          ];
+        };
 
-      # Pool for all external devices
-      fileSystems."/mnt/external_pool" = {
-        device = "mergerfs";
-        fsType = "fuse.mergerfs";
-        options = [
-          "defaults"
-          "allow_other"
-          "minfreespace=1G"
-          "category.create=mfs"
-          "branches=/mnt/external/*"
-        ];
+        "/mnt/external_pool" = {
+          device = "mergerfs";
+          fsType = "fuse.mergerfs";
+          options = [
+            "defaults"
+            "allow_other"
+            "minfreespace=1G"
+            "category.create=mfs"
+            "branches=/mnt/external/*"
+          ];
+        };
       };
 
       # Setgid enforcing for media group (GID 169)
       users.groups.media.gid = 169;
 
       # Create parent mount points and temporary state dirs
-      systemd.tmpfiles.rules = [
-        "d /mnt/tier-a 0775 root media -"
-        "d /mnt/tier-b 0775 root media -"
-        "d /mnt/tier-c 0775 root media -"
-        "d /mnt/external 0775 root media -"
-        "d /run/nixhome-pending-disks 0755 root root -"
-      ];
+      systemd = {
+        tmpfiles.rules = [
+          "d /mnt/tier-a 0775 root media -"
+          "d /mnt/tier-b 0775 root media -"
+          "d /mnt/tier-c 0775 root media -"
+          "d /mnt/external 0775 root media -"
+          "d /run/nixhome-pending-disks 0755 root root -"
+        ];
 
-      # ── PENDING DISKS WATCHER ───────────────────────────────────────────────
-      systemd.services.nixhome-pending-watcher = {
-        description = "Scans for new unlabelled legacy drives";
-        wantedBy = [ "multi-user.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          ExecStart = pkgs.writeShellScript "pending-watcher" ''
-            set -euo pipefail
-            PENDING_DIR="/run/nixhome-pending-disks"
-            mkdir -p "$PENDING_DIR"
+        # ── PENDING DISKS WATCHER ───────────────────────────────────────────────
+        services.nixhome-pending-watcher = {
+          description = "Scans for new unlabelled legacy drives";
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig = {
+            Type = "oneshot";
+            ExecStart = pkgs.writeShellScript "pending-watcher" ''
+              set -euo pipefail
+              PENDING_DIR="/run/nixhome-pending-disks"
+              mkdir -p "$PENDING_DIR"
 
-            # Check raw disks using blkid
-            for dev in /dev/sd*; do
-              [ -b "$dev" ] || continue
-              # If it has no filesystem label, mark it pending
-              if ! ${pkgs.util-linux}/bin/blkid -o value -s LABEL "$dev" >/dev/null 2>&1; then
-                echo "Unlabelled disk found: $dev"
-                echo "PENDING:$dev:$(date -Iseconds)" > "$PENDING_DIR/$(basename "$dev").pending"
-              fi
-            done
-          '';
+              # Check raw disks using blkid
+              for dev in /dev/sd*; do
+                [ -b "$dev" ] || continue
+                # If it has no filesystem label, mark it pending
+                if ! ${pkgs.util-linux}/bin/blkid -o value -s LABEL "$dev" >/dev/null 2>&1; then
+                  echo "Unlabelled disk found: $dev"
+                  echo "PENDING:$dev:$(date -Iseconds)" > "$PENDING_DIR/$(basename "$dev").pending"
+                fi
+              done
+            '';
 
-          # Sandboxing & Hardening
-          ProtectSystem = "strict";
-          ProtectHome = true;
-          PrivateNetwork = true;
-          ReadWritePaths = [ "/run/nixhome-pending-disks" ];
-          CapabilityBoundingSet = [ "CAP_SYS_ADMIN" ];
+            # Sandboxing & Hardening
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateNetwork = true;
+            ReadWritePaths = [ "/run/nixhome-pending-disks" ];
+            CapabilityBoundingSet = [ "CAP_SYS_ADMIN" ];
+          };
         };
-      };
 
-      systemd.timers.nixhome-pending-watcher = {
-        wantedBy = [ "timers.target" ];
-        timerConfig = {
-          OnBootSec = "1min";
-          OnUnitActiveSec = "5min";
-          RandomizedDelaySec = "15";
+        timers.nixhome-pending-watcher = {
+          wantedBy = [ "timers.target" ];
+          timerConfig = {
+            OnBootSec = "1min";
+            OnUnitActiveSec = "5min";
+            RandomizedDelaySec = "15";
+          };
         };
       };
     })
