@@ -34,6 +34,7 @@ let
   cfgFilebrowser = config.my.services.filebrowser;
   cfgLinkwarden = config.my.services.linkwarden;
   cfgOpenWebui = config.my.services.open-webui;
+  cfgHermes = config.my.services.hermes;
 
   anyEnabled =
     cfgVaultwarden.enable ||
@@ -44,7 +45,8 @@ let
     cfgN8n.enable ||
     cfgFilebrowser.enable ||
     cfgLinkwarden.enable ||
-    cfgOpenWebui.enable;
+    cfgOpenWebui.enable ||
+    cfgHermes.enable;
 
 in
 {
@@ -52,10 +54,15 @@ in
     ./core.nix
     ./iot.nix
     ./automation.nix
+    ./hermes.nix
   ];
 
   # Centralized options declaration for domain 60
   options.my.services = {
+    hermes = {
+      enable = lib.mkEnableOption "NousResearch Hermes Agent & WebUI";
+      port = lib.mkOption { type = lib.types.port; default = 8787; description = "Hermes WebUI port."; };
+    };
     vaultwarden.enable = lib.mkEnableOption "Vaultwarden Password Manager";
     homepage.enable = lib.mkEnableOption "Homepage Dashboard";
 
@@ -70,7 +77,7 @@ in
       mediaDir = lib.mkOption { type = lib.types.str; default = "/var/lib/home-assistant/media"; description = "Media directory (Tier C)."; };
       zigbeeDevice = lib.mkOption { type = lib.types.str; default = "socket://192.168.1.100:6638"; description = "SLZB-06 socket or serial port path."; };
       bluetooth = lib.mkOption { type = lib.types.bool; default = false; description = "Enable bluetooth device access."; };
-      secretFile = lib.mkOption { type = lib.types.nullOr lib.types.path; default = null; description = "Path to SOPS secrets file."; };
+      secretFile = lib.mkOption { type = lib.types.nullOr lib.types.path; default = null; description = "Path to local secrets file."; };
       extraComponents = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ ]; description = "Extra components to load."; };
       trustedProxies = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ "127.0.0.1" "::1" ]; description = "List of trusted upstream proxies."; };
     };

@@ -131,7 +131,7 @@ in
     (lib.mkIf cfgCockpit.enable {
       services.cockpit = {
         enable = true;
-        port = cfgCockpit.port;
+        inherit (cfgCockpit) port;
       };
 
       services.caddy.virtualHosts."admin.${domain}" = {

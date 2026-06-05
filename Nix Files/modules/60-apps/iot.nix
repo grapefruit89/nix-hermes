@@ -28,7 +28,7 @@ in
     (lib.mkIf cfgHass.enable {
       users.users.${cfgHass.user} = {
         isSystemUser = true;
-        group = cfgHass.group;
+        inherit (cfgHass) group;
         home = cfgHass.stateDir;
         extraGroups = [ "dialout" "video" "media" ] ++ (lib.optional cfgHass.bluetooth "bluetooth");
       };
@@ -37,7 +37,7 @@ in
       services.home-assistant = {
         enable = true;
         configDir = cfgHass.stateDir;
-        extraComponents = cfgHass.extraComponents;
+        inherit (cfgHass) extraComponents;
         config = {
           homeassistant = {
             name = "NixHome";
@@ -94,10 +94,6 @@ in
     })
 
     (lib.mkIf cfgZigbee.enable {
-      sops.secrets.mosquitto_password = {
-        owner = "mosquitto";
-      };
-
       services.mosquitto = {
         enable = true;
         listeners = [{
@@ -107,7 +103,7 @@ in
           settings.allow_anonymous = false;
           users = {
             "zigbee2mqtt" = {
-              hashedPasswordFile = config.sops.secrets.mosquitto_password.path;
+              hashedPasswordFile = "/var/lib/secrets/mosquitto_password";
             };
           };
         }];
@@ -124,7 +120,7 @@ in
 
       services.zigbee2mqtt = {
         enable = true;
-        dataDir = cfgZigbee.dataDir;
+        inherit (cfgZigbee) dataDir;
         settings = {
           homeassistant = { enabled = true; };
           permit_join = false;
@@ -134,7 +130,7 @@ in
           };
           serial = {
             port = cfgZigbee.zigbeeDevice;
-            adapter = cfgZigbee.adapter;
+            inherit (cfgZigbee) adapter;
           };
           frontend = {
             port = cfgZigbee.zigbeePort;

@@ -29,8 +29,8 @@ in
   config = lib.mkIf anyEnabled {
     systemd.services.media-stack-config-sync = {
       description = "Declarative Media Stack Locale and Application Sync Orchestrator";
-      after = [ "sops-nix.service" "prowlarr.service" "sonarr.service" "radarr.service" "sabnzbd.service" "jellyfin.service" ];
-      wants = [ "sops-nix.service" "prowlarr.service" "sonarr.service" "radarr.service" "sabnzbd.service" "jellyfin.service" ];
+      after = [ "prowlarr.service" "sonarr.service" "radarr.service" "sabnzbd.service" "jellyfin.service" ];
+      wants = [ "prowlarr.service" "sonarr.service" "radarr.service" "sabnzbd.service" "jellyfin.service" ];
       wantedBy = [ "multi-user.target" ];
       path = with pkgs; [ curl jq gnugrep coreutils python3 systemd ];
 

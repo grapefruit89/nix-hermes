@@ -1,0 +1,14 @@
+# ==============================================================================
+# SOPS Encryption Configuration ( .sops.yaml )
+# ==============================================================================
+
+keys:
+  - &admin_moritz age1w9axdsxetqmsj234h684w564vvpsw5fk6wrpve60n9ndv4mlgylqlr07j5
+  - &host_q958    age1cel4cvcjx6chftyuc87r52srce93f38gmg070mzum97zlkzan53sedn582
+
+creation_rules:
+  - path_regex: secrets\.sops\.yaml$
+    key_groups:
+      - age:
+          - *admin_moritz
+          - *host_q958

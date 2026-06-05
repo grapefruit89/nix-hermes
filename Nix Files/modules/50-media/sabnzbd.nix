@@ -24,10 +24,6 @@ let
 in
 {
   config = lib.mkIf cfgSabnzbd.enable {
-    sops.secrets.sabnzbd_api_key = { owner = "root"; };
-    sops.secrets.sabnzbd_usenet_user = { owner = "root"; };
-    sops.secrets.sabnzbd_usenet_password = { owner = "root"; };
-
     services.sabnzbd = {
       enable = true;
       openFirewall = false;

@@ -12,20 +12,20 @@ TARGET_COUNTRY_CODE=$(echo "$TARGET_UI_CULTURE" | cut -d- -f2 | tr '[:lower:]' '
 echo "Target UI Culture: $TARGET_UI_CULTURE"
 echo "Target Country Code: $TARGET_COUNTRY_CODE"
 
-# 1. Load Declarative API keys from SOPS Decrypted Secrets
-PROWLARR_KEY=$(cat /run/secrets/prowlarr_api_key 2>/dev/null || echo "prowlarr_placeholder_key")
-SONARR_KEY=$(cat /run/secrets/sonarr_api_key 2>/dev/null || echo "sonarr_placeholder_key")
-RADARR_KEY=$(cat /run/secrets/radarr_api_key 2>/dev/null || echo "radarr_placeholder_key")
-SAB_KEY=$(cat /run/secrets/sabnzbd_api_key 2>/dev/null || echo "sabnzbd_placeholder_key")
-SCENENZBS_KEY=$(cat /run/secrets/scenenzbs_api_key 2>/dev/null || echo "scenenzbs_placeholder_key")
+# 1. Load Declarative API keys from Local Secrets
+PROWLARR_KEY=$(cat /var/lib/secrets/prowlarr_api_key 2>/dev/null || echo "prowlarr_placeholder_key")
+SONARR_KEY=$(cat /var/lib/secrets/sonarr_api_key 2>/dev/null || echo "sonarr_placeholder_key")
+RADARR_KEY=$(cat /var/lib/secrets/radarr_api_key 2>/dev/null || echo "radarr_placeholder_key")
+SAB_KEY=$(cat /var/lib/secrets/sabnzbd_api_key 2>/dev/null || echo "sabnzbd_placeholder_key")
+SCENENZBS_KEY=$(cat /var/lib/secrets/scenenzbs_api_key 2>/dev/null || echo "scenenzbs_placeholder_key")
 
 USENET_USER="placeholder_user"
 USENET_PASS="placeholder_pass"
-if [ -f "/run/secrets/sabnzbd_usenet_user" ]; then
-  USENET_USER=$(cat /run/secrets/sabnzbd_usenet_user)
+if [ -f "/var/lib/secrets/sabnzbd_usenet_user" ]; then
+  USENET_USER=$(cat /var/lib/secrets/sabnzbd_usenet_user)
 fi
-if [ -f "/run/secrets/sabnzbd_usenet_password" ]; then
-  USENET_PASS=$(cat /run/secrets/sabnzbd_usenet_password)
+if [ -f "/var/lib/secrets/sabnzbd_usenet_password" ]; then
+  USENET_PASS=$(cat /var/lib/secrets/sabnzbd_usenet_password)
 fi
 
 # 2. Inject Declarative API Keys and Restart Services if Drift Detected

@@ -14,13 +14,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    sops-nix = {
-      url = "github:Mic92/sops-nix";
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, impermanence, home-manager, sops-nix, ... }: {
+  outputs = { self, nixpkgs, impermanence, home-manager, hermes-agent, ... }: {
     nixosConfigurations = {
       q958 = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
@@ -29,7 +29,7 @@
           ./hosts/q958/configuration.nix
           impermanence.nixosModules.impermanence
           home-manager.nixosModules.home-manager
-          sops-nix.nixosModules.sops
+          hermes-agent.nixosModules.default
         ];
       };
 
@@ -39,7 +39,6 @@
         modules = [
           ./hosts/laptop/configuration.nix
           home-manager.nixosModules.home-manager
-          sops-nix.nixosModules.sops
         ];
       };
     };

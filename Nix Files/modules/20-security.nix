@@ -65,7 +65,11 @@ in
   # ============================================================================
   options.my.security = {
     sovereign-unlock = {
-      enable = lib.mkEnableOption "Sovereign Unlock LUKS cascade (TPM2/Tang/FIDO2/initrd-SSH)";
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = config.my.mode == "production";
+        description = "Sovereign Unlock LUKS cascade (TPM2/Tang/FIDO2/initrd-SSH)";
+      };
       luksDevice = lib.mkOption {
         type = lib.types.str;
         default = "/dev/disk/by-label/NIXHOME_CRYPT";
@@ -88,7 +92,24 @@ in
       };
     };
 
-    ssh-zerotrust.enable = lib.mkEnableOption "Hardened Zero-Trust Production SSH settings";
+    ssh-zerotrust.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = config.my.mode == "production";
+      description = "Hardened Zero-Trust Production SSH settings";
+    };
+
+    dropbear-rescue = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable Dropbear rescue SSH daemon on the main system (stage 2) on a custom port.";
+      };
+      port = lib.mkOption {
+        type = lib.types.port;
+        default = 2222;
+        description = "Port for the Dropbear rescue daemon.";
+      };
+    };
 
     fail2ban = {
       enable = lib.mkEnableOption "Fail2ban intrusion prevention system";
@@ -161,7 +182,7 @@ in
         ssh = lib.mkIf (cfgUnlock.authorizedKeys != [ ]) {
           enable = true;
           port = cfgUnlock.sshPort;
-          authorizedKeys = cfgUnlock.authorizedKeys;
+          inherit (cfgUnlock) authorizedKeys;
           hostKeys = [ cfgUnlock.hostKey ];
           shell = "${pkgs.writeShellScript "initrd-unlock-shell" ''
             echo "NMS v4.2 - Remote initrd Unlock Shell"
@@ -203,8 +224,6 @@ in
         "tpm_tis_core"
         "dm_crypt"
         "aes"
-        "aes_x86_64"
-        "sha256"
       ];
 
       assertions = [{
@@ -213,8 +232,24 @@ in
       }];
     })
 
+    # ── DEVELOPMENT SSHD ──────────────────────────────────────────────────────
+    (lib.mkIf (config.my.mode == "development") {
+      services.openssh = {
+        enable = true;
+        ports = lib.mkForce [ 22 ];
+        settings = {
+          PermitRootLogin = lib.mkForce "yes";
+          PasswordAuthentication = lib.mkForce true;
+          KbdInteractiveAuthentication = lib.mkForce true;
+        };
+      };
+
+      # Copy admin public keys to root user for easy passwordless access
+      users.users.root.openssh.authorizedKeys.keys = config.users.users.${user}.openssh.authorizedKeys.keys or [ ];
+    })
+
     # ── ZERO-TRUST HARDENED SSHD ──────────────────────────────────────────────
-    (lib.mkIf cfgSsh.enable {
+    (lib.mkIf (config.my.mode == "production" && cfgSsh.enable) {
       services.openssh = {
         enable = true;
         openFirewall = false;
@@ -245,10 +280,7 @@ in
         extraConfig = lib.mkForce "";
       };
 
-      environment.shellAliases = {
-        sops-edit = "sudo bash -c 'SOPS_AGE_KEY_FILE=/var/lib/sops-nix/key.txt sops /home/moritz/nix-config/secrets.sops.yaml'";
-        sops-show = "sudo bash -c 'SOPS_AGE_KEY_FILE=/var/lib/sops-nix/key.txt sops -d /home/moritz/nix-config/secrets.sops.yaml'";
-      };
+
 
       # Rate-Limiting für SSH per nftables zum Schutz vor Brute-Force
       networking.firewall.extraInputRules = lib.mkAfter ''
@@ -280,9 +312,9 @@ in
       lib.mkIf cfg.enable {
         services.fail2ban = {
           enable = true;
-          banaction = cfg.banaction;
-          bantime = cfg.bantime;
-          maxretry = cfg.maxretry;
+          inherit (cfg) banaction;
+          inherit (cfg) bantime;
+          inherit (cfg) maxretry;
           bantime-increment = {
             enable = cfg.banIncrementEnable;
             multipliers = cfg.banIncrementMultipliers;
@@ -294,8 +326,8 @@ in
                 enabled = true;
                 mode = cfg.sshJail.mode;
                 filter = "sshd[mode=${cfg.sshJail.mode}]";
-                findtime = cfg.findtime;
-                maxretry = cfg.maxretry;
+                inherit (cfg) findtime;
+                inherit (cfg) maxretry;
               };
             };
 
@@ -305,7 +337,7 @@ in
                 filter = "caddy-json";
                 action = cfg.banaction;
                 maxretry = cfg.webJails.caddy.maxretry;
-                findtime = cfg.findtime;
+                inherit (cfg) findtime;
                 backend = "systemd";
               };
             };
@@ -313,16 +345,16 @@ in
             vaultwarden = lib.mkIf cfg.appJails.vaultwarden.enable {
               settings = {
                 enabled = true;
-                findtime = cfg.findtime;
-                maxretry = cfg.maxretry;
+                inherit (cfg) findtime;
+                inherit (cfg) maxretry;
               };
             };
 
             paperless = lib.mkIf cfg.appJails.paperless.enable {
               settings = {
                 enabled = true;
-                findtime = cfg.findtime;
-                maxretry = cfg.maxretry;
+                inherit (cfg) findtime;
+                inherit (cfg) maxretry;
               };
             };
 
@@ -341,6 +373,47 @@ in
           failregex = ^.*"remote_ip":"<ADDR>".*"status":(401|403).*$
           journalmatch = _SYSTEMD_UNIT=caddy.service
         '';
+      }
+    )
+
+    # ── DROPBEAR STAGE-2 RESCUE DAEMON ────────────────────────────────────────
+    (
+      let
+        cfgRescue = config.my.security.dropbear-rescue;
+      in
+      lib.mkIf cfgRescue.enable {
+        systemd.services.dropbear-rescue = {
+          description = "Dropbear emergency rescue SSH server";
+          wantedBy = [ "multi-user.target" ];
+          after = [ "network.target" ];
+
+          serviceConfig = {
+            Type = "simple";
+            ExecStartPre = pkgs.writeShellScript "dropbear-rescue-prepare" ''
+              # Create home ssh directories
+              mkdir -p /home/moritz/.ssh /root/.ssh
+              chmod 700 /home/moritz/.ssh /root/.ssh
+              
+              # Sync authorized keys from NixOS generated files
+              if [ -f /etc/ssh/authorized_keys.d/moritz ]; then
+                cp /etc/ssh/authorized_keys.d/moritz /home/moritz/.ssh/authorized_keys
+                chmod 600 /home/moritz/.ssh/authorized_keys
+                chown moritz:users /home/moritz/.ssh/authorized_keys
+              fi
+              
+              # Also allow root login via moritz's key for emergency rescue
+              if [ -f /etc/ssh/authorized_keys.d/moritz ]; then
+                cp /etc/ssh/authorized_keys.d/moritz /root/.ssh/authorized_keys
+                chmod 600 /root/.ssh/authorized_keys
+                chown root:root /root/.ssh/authorized_keys
+              fi
+            '';
+            ExecStart = "${pkgs.dropbear}/bin/dropbear -F -E -s -p ${toString cfgRescue.port} -r /var/lib/dropbear/dropbear_ed25519_host_key -R";
+            Restart = "always";
+            RestartSec = "10s";
+            StateDirectory = "dropbear";
+          };
+        };
       }
     )
   ];

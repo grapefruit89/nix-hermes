@@ -35,23 +35,12 @@ in
 {
   config = lib.mkMerge [
     (lib.mkIf cfgVaultwarden.enable {
-      # SOPS SECRETS
-      sops.secrets.vaultwarden_admin_token = {
-        owner = "vaultwarden";
-      };
 
-      # SOPS ENV TEMPLATE
-      sops.templates."vaultwarden.env" = {
-        owner = "vaultwarden";
-        content = ''
-          ADMIN_TOKEN=${config.sops.placeholder.vaultwarden_admin_token}
-        '';
-      };
 
       services.vaultwarden = {
         enable = true;
         dbBackend = "sqlite"; # Lokale SQLite DB für minimale externe Latenz
-        environmentFile = config.sops.templates."vaultwarden.env".path;
+        environmentFile = "/var/lib/secrets/vaultwarden.env";
 
         config = {
           ROCKET_ADDRESS = "127.0.0.1";
@@ -128,7 +117,7 @@ in
           "/var/lib/vaultwarden"
           "/var/log/vaultwarden"
         ];
-        EnvironmentFile = lib.mkForce config.sops.templates."vaultwarden.env".path;
+        EnvironmentFile = lib.mkForce "/var/lib/secrets/vaultwarden.env";
       };
     })
 
@@ -465,7 +454,7 @@ in
       services.filebrowser = {
         enable = true;
         settings = {
-          port = cfgFilebrowser.port;
+          inherit (cfgFilebrowser) port;
           address = "127.0.0.1";
           root = cfgFilebrowser.rootPath;
           database = cfgFilebrowser.databasePath;
@@ -495,21 +484,12 @@ in
     })
 
     (lib.mkIf cfgLinkwarden.enable {
-      sops.secrets.linkwarden_nextauth_secret = {
-        owner = "root";
-      };
 
-      sops.templates."linkwarden.env" = {
-        owner = "root";
-        content = ''
-          NEXTAUTH_SECRET=${config.sops.placeholder.linkwarden_nextauth_secret}
-        '';
-      };
 
       services.linkwarden = {
         enable = true;
-        port = cfgLinkwarden.port;
-        environmentFile = config.sops.templates."linkwarden.env".path;
+        inherit (cfgLinkwarden) port;
+        environmentFile = "/var/lib/secrets/linkwarden.env";
         environment = {
           NEXTAUTH_URL = "https://links.${domain}/api/v1/auth";
         };
@@ -546,7 +526,7 @@ in
       services.open-webui = {
         enable = true;
         host = "127.0.0.1";
-        port = cfgOpenWebui.port;
+        inherit (cfgOpenWebui) port;
         environment = {
           OLLAMA_API_BASE_URL = cfgOpenWebui.ollamaUrl;
           SCARF_NO_ANALYTICS = "True";

@@ -153,3 +153,28 @@ sops-show
   ```nix
   services.fail2ban.extraPackages = [ pkgs.ipset pkgs.iptables pkgs.nftables ];
   ```
+
+---
+
+### Dropbear Stage-2 Rescue SSH Daemon
+* **The Setup:** The rescue daemon runs in the system environment (stage 2) on port 2222. It is independent of OpenSSH configuration and acts as a secure backdoor.
+* **Authentication:** Password authentication is completely disabled. Users must log in using their registered SSH public keys.
+* **Key Synchronization:** The `dropbear-rescue.service` automatically copies public keys from `/etc/ssh/authorized_keys.d/` to the respective users' `~/.ssh/authorized_keys` file during the startup sequence.
+* **Connection command:**
+  ```bash
+  ssh -p 2222 moritz@192.168.2.73
+  ```
+
+---
+
+### System Mode Switch (development vs production)
+* **The Concept:** A single configuration flag `my.mode` in your active host configuration toggles the system between open development and hardened production security postures.
+* **Development Mode (`my.mode = "development";`):**
+  - Standard OpenSSH runs on Port 22.
+  - Password authentication and root logins are enabled.
+  - Ephemeral root (Impermanence) and Sovereign Unlocking are disabled.
+* **Production Mode (`my.mode = "production";`):**
+  - Hardened OpenSSH runs on Port 53844.
+  - Password authentication is disabled.
+  - Ephemeral root (Impermanence) on tmpfs and Sovereign Unlocking are enabled.
+* **Toggling the Mode:** Change `my.mode` inside `configuration.nix` and run `nixos-rebuild switch`.

@@ -32,9 +32,7 @@ let
 in
 {
   config = lib.mkMerge [
-    (lib.mkIf cfgSonarr.enable {
-      sops.secrets.sonarr_api_key = { owner = "root"; };
-    })
+
     (lib.mkIf cfgSonarr.enable (arrHelper.mkArrService {
       name = "sonarr";
       port = ports.sonarr;
@@ -43,9 +41,7 @@ in
       gid = 989;
     }))
 
-    (lib.mkIf cfgRadarr.enable {
-      sops.secrets.radarr_api_key = { owner = "root"; };
-    })
+
     (lib.mkIf cfgRadarr.enable (arrHelper.mkArrService {
       name = "radarr";
       port = ports.radarr;
@@ -62,10 +58,7 @@ in
       gid = 987;
     }))
 
-    (lib.mkIf cfgProwlarr.enable {
-      sops.secrets.prowlarr_api_key = { owner = "root"; };
-      sops.secrets.scenenzbs_api_key = { owner = "root"; };
-    })
+
     (lib.mkIf cfgProwlarr.enable (arrHelper.mkArrService {
       name = "prowlarr";
       port = ports.prowlarr;

@@ -246,12 +246,6 @@ in
         '';
 
         settings = {
-          # Rationale: Erzwingt UTF-8 Locales für reibungslosen Start aller migrierten Apps (verknüpft mit Zentral-Locale)
-          lc_messages = config.my.configs.locale.default;
-          lc_monetary = config.my.configs.locale.default;
-          lc_numeric = config.my.configs.locale.default;
-          lc_time = config.my.configs.locale.default;
-
           # Performance-Tuning für 16GB Homelab Hardware (Fujitsu Q958)
           shared_buffers = "4GB";
           work_mem = "64MB";
@@ -294,7 +288,7 @@ in
 
     # ── TAILSCALE VPN ─────────────────────────────────────────────────────────
     (lib.mkIf config.my.services.tailscale.enable {
-      sops.secrets.tailscale_token = { owner = "root"; };
+
 
       services.tailscale = {
         enable = true;
@@ -318,7 +312,7 @@ in
             sleep 2
             status=$(${pkgs.tailscale}/bin/tailscale status --json | ${pkgs.jq}/bin/jq -r .BackendState)
             if [ "$status" = "NeedsLogin" ] || [ "$status" = "Stopped" ]; then
-              ${pkgs.tailscale}/bin/tailscale up --authkey="$(cat /run/secrets/tailscale_token)"
+              ${pkgs.tailscale}/bin/tailscale up --authkey="$(cat /var/lib/secrets/tailscale_token)"
             fi
           '';
         };
@@ -341,13 +335,13 @@ in
 
     # ── PRIVADO VPN WIREGUARD CLIENT ──────────────────────────────────────────
     (lib.mkIf config.my.services.privado-vpn.enable {
-      sops.secrets.privado_private_key = { owner = "root"; };
+
 
       networking.wg-quick.interfaces.privado = {
         autostart = true;
         address = [ config.my.services.privado-vpn.ipAddress ];
         dns = config.my.services.privado-vpn.dns;
-        privateKeyFile = config.sops.secrets.privado_private_key.path;
+        privateKeyFile = "/var/lib/secrets/privado_private_key";
 
         peers = [{
           publicKey = config.my.services.privado-vpn.publicKey;

@@ -53,6 +53,7 @@
 
   networking.hostName = "q958";
   networking.hostId = "deadbeef";
+  networking.networkmanager.enable = true;
 
   # ─── DOMAIN 00: CORE SYSTEM SERVICES ───────────────────────────────────────
   my.core = {
@@ -85,29 +86,26 @@
     pocket-id.enable = true;
   };
 
+  # ─── SYSTEM MODE SWITCH ─────────────────────────────────────────────────────
+  my.mode = "development";
+
   # ─── DOMAIN 20: SECURITY & HARDENING ────────────────────────────────────────
   my.security = {
     sovereign-unlock = {
-      enable = true;
       luksDevice = "/dev/disk/by-label/NIXHOME_CRYPT";
       sshPort = 2222;
       authorizedKeys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx moritz@client"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJRDbyFjT4SEL8yxNwZuEBPORD82qlJJhdr2r4qz1vCX"
       ];
     };
     firewall.enable = true;
     crowdsec.enable = true;
-    ssh-zerotrust.enable = true;
     fail2ban.enable = true;
+    dropbear-rescue.enable = true;
   };
-
-  # SOPS Secrets age key setup
-  sops.age.sshKeyPaths = [ "/persist/etc/ssh/ssh_host_ed25519_key" ];
-  sops.defaultSopsFile = ../../secrets.sops.yaml;
 
   # ─── DOMAIN 30: STORAGE SYSTEM ──────────────────────────────────────────────
   my.impermanence = {
-    enable = true;
     persistentDisk = "/dev/disk/by-label/NIXHOME_PERSIST";
     persistMountPoint = "/persist";
   };
@@ -127,12 +125,8 @@
     healthcheckUrl = "https://hc-ping.com/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
   };
 
-  # Ephemeral stateless root tmpfs definition
-  fileSystems."/" = {
-    device = "none";
-    fsType = "tmpfs";
-    options = [ "defaults" "size=16G" "mode=755" ];
-  };
+  # Ephemeral stateless root tmpfs definition is declared dynamically in 30-storage.nix if my.impermanence.enable is true.
+  # During development (non-impermanent root), we rely on hardware-nixos.nix's ext4 root definition.
 
   # ─── DOMAIN 50: UNIFIED MEDIA ENGINE ─────────────────────────────────────────
   my.services = {
@@ -149,10 +143,11 @@
   my.services.vaultwarden.enable = true;
   my.services.homepage.enable = true;
   my.services.paperless.enable = true;
-  my.services.n8n.enable = true;
+  my.services.n8n.enable = false;
   my.services.filebrowser.enable = true;
   my.services.linkwarden.enable = true;
   my.services.open-webui.enable = true;
+  my.services.hermes.enable = true;
 
   # Home Automation & IoT Integration (Mined from External GitHub Repositories Phase 2)
   my.services.home-assistant = {

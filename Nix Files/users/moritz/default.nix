@@ -18,7 +18,7 @@
     extraGroups = [ "networkmanager" "wheel" ];
     shell = pkgs.bash;
     openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx moritz@client"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJRDbyFjT4SEL8yxNwZuEBPORD82qlJJhdr2r4qz1vCX"
     ];
 
     # Best Practice: Passwort-Hash über SOPS einbinden

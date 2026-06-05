@@ -77,10 +77,7 @@ in
   config = lib.mkMerge [
     # ─── SECTION 1: GATUS MONITORING ──────────────────────────────────────────
     (lib.mkIf cfgGatus.enable {
-      sops.secrets.gatus_ssh_key = {
-        owner = "gatus";
-        group = "gatus";
-      };
+
       users.users.monitoring = {
         isSystemUser = true;
         group = "media";
@@ -304,8 +301,7 @@ in
           AmbientCapabilities = [ "CAP_NET_RAW" ];
           StateDirectory = "gatus";
         };
-        after = [ "network.target" "sops-nix.service" ];
-        wants = [ "sops-nix.service" ];
+        after = [ "network.target" ];
       };
     })
 
@@ -522,14 +518,10 @@ in
         ReadWritePaths = [ "/var/lib/crowdsec" ];
       };
 
-      sops.secrets.crowdsec_bouncer_key = {
-        owner = "root";
-      };
-
       services.crowdsec-firewall-bouncer = {
         enable = true;
         registerBouncer.enable = false;
-        secrets.apiKeyPath = config.sops.secrets.crowdsec_bouncer_key.path;
+        secrets.apiKeyPath = "/var/lib/secrets/crowdsec_bouncer_key";
         settings = {
           api_url = "http://127.0.0.1:8080/";
           mode = "nftables";

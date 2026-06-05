@@ -46,6 +46,12 @@ in
     zram-swap.enable = lib.mkEnableOption "Aggressive komprimierter ZRAM RAM-swap";
   };
 
+  options.my.mode = lib.mkOption {
+    type = lib.types.enum [ "development" "production" ];
+    default = "development";
+    description = "Overall system mode: development (open) or production (hardened)";
+  };
+
   options.my.configs = {
     identity = {
       user = lib.mkOption { type = lib.types.str; default = "moritz"; description = "Primary user name."; };

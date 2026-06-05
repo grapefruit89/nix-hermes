@@ -26,6 +26,7 @@
 let
   cfg = config.my.security.firewall;
   sshPort = config.my.ports.ssh;
+  sshPorts = (if config.my.mode == "development" then [ 22 ] else [ sshPort ]) ++ (lib.optional ((config.my.security ? dropbear-rescue) && config.my.security.dropbear-rescue.enable) config.my.security.dropbear-rescue.port);
 
 in
 {
@@ -108,8 +109,8 @@ in
             tcp dport { 80, 443 } accept
 
             # 9. SSH rate-limiting and access
-            tcp dport ${toString sshPort} ct state new update @ssh_meter { ip saddr limit rate over 4/minute } drop
-            tcp dport ${toString sshPort} accept
+            tcp dport { ${lib.concatStringsSep ", " (map toString sshPorts)} } ct state new update @ssh_meter { ip saddr limit rate over 4/minute } drop
+            tcp dport { ${lib.concatStringsSep ", " (map toString sshPorts)} } accept
 
             # 10. Log all other dropped packets (rate limited)
             limit rate 5/second log prefix "nftables-dropped: "

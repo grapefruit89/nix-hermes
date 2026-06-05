@@ -29,9 +29,9 @@ in
       services.paperless = {
         enable = true;
         address = "127.0.0.1";
-        port = cfgPaperless.port;
-        dataDir = cfgPaperless.dataDir;
-        consumptionDir = cfgPaperless.consumptionDir;
+        inherit (cfgPaperless) port;
+        inherit (cfgPaperless) dataDir;
+        inherit (cfgPaperless) consumptionDir;
         settings = {
           PAPERLESS_URL = "https://paperless.${domain}";
           PAPERLESS_ALLOWED_HOSTS = "localhost,127.0.0.1,paperless.${domain}";

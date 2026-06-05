@@ -36,11 +36,13 @@ let
   # Tier A (NVMe/SSD Cache): Persistent high-priority states
   tierA = {
     paths = [
-      "/var/lib/sops-nix"
+      "/var/lib/secrets"
       "/var/lib/nixos"
       "/etc/nixos"
       "/var/lib/tailscale"
       "/var/lib/postgresql"
+      "/var/lib/hermes"
+      "/root/.hermes"
       "/var/lib/vaultwarden"
       "/var/lib/jellyfin"
       "/var/lib/jellyseerr"
@@ -85,7 +87,11 @@ in
   # ============================================================================
   options.my = {
     impermanence = {
-      enable = lib.mkEnableOption "Sovereign Impermanence (ephemeral tmpfs root)";
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = config.my.mode == "production";
+        description = "Sovereign Impermanence (ephemeral tmpfs root)";
+      };
       persistentDisk = lib.mkOption {
         type = lib.types.str;
         default = "/dev/disk/by-label/NIXHOME_PERSIST";
@@ -304,13 +310,10 @@ in
 
     # ── RESTIC ENCRYPTED CLOUD SYNC ───────────────────────────────────────────
     (lib.mkIf cfgBackup.enable {
-      sops.secrets.restic_password = { owner = "root"; };
-      sops.secrets.restic_s3_creds = { owner = "root"; };
-
       services.restic.backups.tier-a-sovereign = {
         initialize = true;
-        passwordFile = config.sops.secrets.restic_password.path;
-        environmentFile = config.sops.secrets.restic_s3_creds.path;
+        passwordFile = "/var/lib/secrets/restic_password";
+        environmentFile = "/var/lib/secrets/restic_s3_creds";
 
         paths = [
           "${cfgImp.persistMountPoint}/var/lib/postgresql"
@@ -342,8 +345,6 @@ in
       };
 
       systemd.services.restic-backups-tier-a-sovereign = {
-        wants = [ "sops-nix.service" ];
-        after = [ "sops-nix.service" ];
         postStop = lib.mkIf (cfgBackup.healthcheckUrl != "") ''
           ${pkgs.curl}/bin/curl -fsS -m 10 --retry 5 "${cfgBackup.healthcheckUrl}"
         '';
@@ -358,8 +359,7 @@ in
       lib.mkIf cfgMover.enable {
         systemd.services.nixhome-storage-mover = {
           description = "Precision Storage Cache Mover (rclone local engine)";
-          after = [ "local-fs.target" "network.target" "sops-nix.service" ];
-          wants = [ "sops-nix.service" ];
+          after = [ "local-fs.target" "network.target" ];
 
           serviceConfig = {
             Type = "oneshot";

@@ -17,7 +17,7 @@
     services.${name} = {
       enable = true;
       openFirewall = false;
-      dataDir = dataDir;
+      inherit dataDir;
     };
 
     users.groups.${name} = {
