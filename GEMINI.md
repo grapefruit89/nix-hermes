@@ -98,6 +98,24 @@ Alle einmaligen Berichte, Audit-Ergebnisse, temporären Skripte und Notizen, die
 - Der Ordner dient als persönliches Arbeitsjournal und muss nicht versioniert werden.
 - KIs, die im Projekt arbeiten, dürfen diesen Ordner lesen (um Kontext zu verstehen), aber **niemals** seine Inhalte in die Datenbank schreiben oder als autoritative Quelle verwenden.
 
+### 🤖 KI-Autonomie-Direktive (Zero‑Friction Mode)
+
+Ziel ist es, menschliche Eingriffe auf das absolute Minimum zu reduzieren. Die KI (Antigravity, Claude, Gemini) **darf** und **soll** bei folgenden, klar definierten Aufgaben eigenständig handeln – ohne vorherige Rückfrage:
+
+#### Erlaubte autonome Aktionen (immer erlaubt)
+1. **Einspielen von vordefinierten Fixes** – wenn in einem Chat oder einer Analyse konkrete Diffs für ein bekanntes Problem (z. B. aus Batch 5) vorliegen, darf die KI diese Fixes **sofort** in die entsprechenden Dateien einfügen.
+2. **Datenbank synchronisieren** – nach jeder Änderung an `.nix` oder `.md` Dateien **muss** die KI `python tools/build_dbs.py` and `python tools/validate_ssot.py` ausführen.
+3. **Git‑Commit erstellen** – bei erfolgreicher Validierung **darf** die KI einen Commit mit einer aussagekräftigen Nachricht erstellen. (Push auf Remote nur nach expliziter Freigabe, da Secrets betroffen sein könnten.)
+4. **WSL‑Dev‑Mode aktivieren** – wenn NixOS in WSL installiert ist, darf die KI `nixos-rebuild switch --flake .#wsl` ausführen (nicht auf dem Produktionsserver).
+
+#### Nicht erlaubte Aktionen (bleiben verboten)
+- **`nixos-rebuild switch` auf dem Produktionsserver** – nur der Benutzer selbst.
+- **Änderungen an `secrets.sops.yaml`** – nur der Benutzer.
+- **Löschen von Dateien ausserhalb des definierten Workflows** (z. B. `.temp_workfolder` bleibt unangetastet).
+
+#### Umgang mit dem aktuellen Firewall‑Fix (Batch 5)
+Die vier Fixes (ZFS entfernen, Tailscale‑Forwarding, `curl --ssl-reqd`, SSH Rate‑Limit 10/min) gelten als **eindeutig und unkritisch**. Die KI wird sie ohne Rückfrage in die entsprechenden Dateien einfügen, die Datenbank neu kompilieren, validieren und committen. Der Benutzer wird nur am Ende über das Ergebnis informiert.
+
 ---
 
 ## V. RECONCILIATION LOG
