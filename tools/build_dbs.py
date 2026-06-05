@@ -174,8 +174,8 @@ def build_memdb(target_dir, files):
         pass
         
     # Clean up old document memories and their FTS/tag relationships
-    cursor.execute("DELETE FROM memories_fts WHERE rowid IN (SELECT id FROM memories WHERE memory_type = 'document');")
-    cursor.execute("DELETE FROM memories WHERE memory_type = 'document';")
+    cursor.execute("DELETE FROM memories_fts WHERE rowid IN (SELECT id FROM memories WHERE memory_type = 'general');")
+    cursor.execute("DELETE FROM memories WHERE memory_type = 'general';")
     cursor.execute("DELETE FROM tags WHERE memory_id NOT IN (SELECT id FROM memories);")
     cursor.execute("DELETE FROM relationships WHERE from_memory_id NOT IN (SELECT id FROM memories) OR to_memory_id NOT IN (SELECT id FROM memories);")
     
@@ -213,7 +213,7 @@ def build_memdb(target_dir, files):
         try:
             cursor.execute(
                 "INSERT OR REPLACE INTO memories (content, summary, importance, memory_type, hash) VALUES (?, ?, ?, ?, ?);",
-                (content, summary, 5, 'document', content_hash)
+                (content, summary, 5, 'general', content_hash)
             )
             memory_id = cursor.lastrowid
             
