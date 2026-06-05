@@ -209,7 +209,7 @@ in
 
     # ── MERGERFS HYBRID POOLING ───────────────────────────────────────────────
     (lib.mkIf cfgStorage.enable {
-      boot.supportedFilesystems = [ "zfs" "ext4" ];
+      boot.supportedFilesystems = [ "ext4" ];
 
       # Pooling mounts
       # Pool for Tier B (Slower SSDs, Caches, Downloads)

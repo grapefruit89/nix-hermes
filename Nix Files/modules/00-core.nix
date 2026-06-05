@@ -153,58 +153,60 @@ in
 
     # ── NIX STORE TUNING ──────────────────────────────────────────────────────
     (lib.mkIf cfgNix.enable {
-      nix.settings = {
-        substituters = [
-          "https://cache.nixos.org"
-          "https://nix-community.cachix.org"
-        ];
-        trusted-public-keys = [
-          "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-          "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-        ];
+      nix = {
+        settings = {
+          substituters = [
+            "https://cache.nixos.org"
+            "https://nix-community.cachix.org"
+          ];
+          trusted-public-keys = [
+            "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+            "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+          ];
 
-        # Automatische Store-Optimierung
-        auto-optimise-store = true;
-        builders-use-substitutes = true;
-        fallback = true;
+          # Automatische Store-Optimierung
+          auto-optimise-store = true;
+          builders-use-substitutes = true;
+          fallback = true;
 
-        # GC-Roots für schnelles inkrementelles Rebuilding erhalten
-        keep-outputs = true;
-        keep-derivations = true;
+          # GC-Roots für schnelles inkrementelles Rebuilding erhalten
+          keep-outputs = true;
+          keep-derivations = true;
 
-        # Negativ-Cache verkürzen
-        narinfo-cache-negative-ttl = 0;
+          # Negativ-Cache verkürzen
+          narinfo-cache-negative-ttl = 0;
 
-        # Dynamisches Ressourcen-Management basierend auf RamGB
-        max-jobs =
-          if isLowRam then lib.mkForce 1
-          else if isMidRam then lib.mkForce 2
-          else lib.mkDefault 4;
-        cores =
-          if isLowRam then lib.mkForce 1
-          else if isMidRam then lib.mkForce 2
-          else lib.mkDefault 0;
+          # Dynamisches Ressourcen-Management basierend auf RamGB
+          max-jobs =
+            if isLowRam then lib.mkForce 1
+            else if isMidRam then lib.mkForce 2
+            else lib.mkDefault 4;
+          cores =
+            if isLowRam then lib.mkForce 1
+            else if isMidRam then lib.mkForce 2
+            else lib.mkDefault 0;
 
-        # Build-Timeout gegen hängende Prozesse
-        timeout = 3600;
-        max-silent-time = 600;
+          # Build-Timeout gegen hängende Prozesse
+          timeout = 3600;
+          max-silent-time = 600;
 
-        experimental-features = [ "nix-command" "flakes" "auto-allocate-uids" "cgroups" ];
-        sandbox = true;
-        trusted-users = [ "root" config.my.configs.identity.user ];
-      };
+          experimental-features = [ "nix-command" "flakes" "auto-allocate-uids" "cgroups" ];
+          sandbox = true;
+          trusted-users = [ "root" config.my.configs.identity.user ];
+        };
 
-      # CPU & I/O Prioritäten für Builds (verhindert Host-Freezes)
-      nix.daemonCPUSchedPolicy = "idle";
-      nix.daemonIOSchedClass = "idle";
-      nix.daemonIOSchedPriority = 7;
+        # CPU & I/O Prioritäten für Builds (verhindert Host-Freezes)
+        daemonCPUSchedPolicy = "idle";
+        daemonIOSchedClass = "idle";
+        daemonIOSchedPriority = 7;
 
-      # Wöchentlicher automatischer GC
-      nix.gc = {
-        automatic = true;
-        dates = "weekly";
-        options = "--delete-older-than 7d";
-        persistent = true;
+        # Wöchentlicher automatischer GC
+        gc = {
+          automatic = true;
+          dates = "weekly";
+          options = "--delete-older-than 7d";
+          persistent = true;
+        };
       };
 
       environment.systemPackages = with pkgs; [

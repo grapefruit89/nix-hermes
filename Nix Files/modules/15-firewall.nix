@@ -109,7 +109,7 @@ in
             tcp dport { 80, 443 } accept
 
             # 9. SSH rate-limiting and access
-            tcp dport { ${lib.concatStringsSep ", " (map toString sshPorts)} } ct state new update @ssh_meter { ip saddr limit rate over 4/minute } drop
+            tcp dport { ${lib.concatStringsSep ", " (map toString sshPorts)} } ct state new update @ssh_meter { ip saddr limit rate over 10/minute } drop
             tcp dport { ${lib.concatStringsSep ", " (map toString sshPorts)} } accept
 
             # 10. Log all other dropped packets (rate limited)
@@ -118,6 +118,8 @@ in
 
           chain forward {
             type filter hook forward priority filter; policy drop;
+            iifname "tailscale0" accept comment "Allow Tailscale subnet routing (inbound)"
+            oifname "tailscale0" accept comment "Allow Tailscale subnet routing (outbound)"
           }
 
           chain output {
@@ -148,7 +150,7 @@ in
           for country in ${lib.concatStringsSep " " cfg.blockedCountries}; do
             URL="https://www.ipdeny.com/ipblocks/data/countries/$country.zone"
             echo "Downloading $country IP block list..."
-            if ${pkgs.curl}/bin/curl -fsS -o "$TEMP_DIR/$country.zone" "$URL"; then
+            if ${pkgs.curl}/bin/curl --ssl-reqd -fsS -o "$TEMP_DIR/$country.zone" "$URL"; then
               cat "$TEMP_DIR/$country.zone" >> "$IP_FILE"
             else
               echo "Warning: Failed to fetch zone file for $country. Skipping."

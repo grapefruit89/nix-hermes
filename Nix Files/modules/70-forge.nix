@@ -129,16 +129,28 @@ in
 
     # ── COCKPIT SERVER ADMIN UI ───────────────────────────────────────────────
     (lib.mkIf cfgCockpit.enable {
-      services.cockpit = {
-        enable = true;
-        inherit (cfgCockpit) port;
-      };
+      services = {
+        cockpit = {
+          enable = true;
+          inherit (cfgCockpit) port;
+        };
 
-      services.caddy.virtualHosts."admin.${domain}" = {
-        extraConfig = ''
-          import sso_auth
-          reverse_proxy 127.0.0.1:${toString cfgCockpit.port}
-        '';
+        caddy.virtualHosts = {
+          "admin.${domain}" = {
+            extraConfig = ''
+              import sso_auth
+              reverse_proxy 127.0.0.1:${toString cfgCockpit.port}
+            '';
+          };
+
+          # ── SECURE INTEL AMT INGRESS (SSO POCKET-ID GATEKEEPER) ─────────────────
+          "machines.${domain}" = lib.mkIf cfgCockpit.exposeAmt {
+            extraConfig = ''
+              import sso_auth
+              reverse_proxy 192.168.1.100:16992
+            '';
+          };
+        };
       };
 
       # ── KVM VIRTUALIZATION ENGINE (COCKPIT /MACHINES PATH) ──────────────────
@@ -153,14 +165,6 @@ in
       environment.systemPackages = lib.mkIf cfgCockpit.enableVirtualization [
         pkgs.cockpit-machines # Exposes the native /machines tab inside Cockpit UI
       ];
-
-      # ── SECURE INTEL AMT INGRESS (SSO POCKET-ID GATEKEEPER) ─────────────────
-      services.caddy.virtualHosts."machines.${domain}" = lib.mkIf cfgCockpit.exposeAmt {
-        extraConfig = ''
-          import sso_auth
-          reverse_proxy 192.168.1.100:16992
-        '';
-      };
     })
   ];
 }
