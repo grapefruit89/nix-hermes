@@ -1,4 +1,7 @@
 node_modules/
 *.db
+*.sqlite
+*.sqlite3
 import.sql
 .temp_workfolder/
+secrets.sops.yaml
