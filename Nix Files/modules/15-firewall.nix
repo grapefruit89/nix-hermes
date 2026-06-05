@@ -60,6 +60,16 @@ in
             flags interval
           }
 
+          set crowdsec_blocked_ipv4 {
+            type ipv4_addr
+            flags interval
+          }
+
+          set crowdsec_blocked_ipv6 {
+            type ipv6_addr
+            flags interval
+          }
+
           # Dynamic set to track and rate limit new SSH connections
           set ssh_meter {
             type ipv4_addr
@@ -89,8 +99,10 @@ in
             # 3. Block fragmented packets
             ip frag-off & 0x3fff != 0 drop comment "Drop fragmented packets"
 
-            # 4. Geo-IP drop rule (processed early)
+            # 4. Geo-IP and CrowdSec drop rules (processed early)
             ip saddr @geoip_blocked drop comment "Drop blocked Geo-IP traffic"
+            ip saddr @crowdsec_blocked_ipv4 drop comment "Drop CrowdSec banned IPv4"
+            ip6 saddr @crowdsec_blocked_ipv6 drop comment "Drop CrowdSec banned IPv6"
 
             # 5. ICMP (Ping) throttling and safety rules
             ip protocol icmp icmp type echo-request limit rate over 10/second drop

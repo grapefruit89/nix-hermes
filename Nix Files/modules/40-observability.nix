@@ -409,7 +409,7 @@ in
               domain = "grafana.${domain}";
             };
             security = {
-              secret_key = "SW2YcwTIb9zpOOhoPsMm";
+              secret_key = "$__file{/var/lib/secrets/grafana_secret_key}";
             };
           };
           provision = {
@@ -478,6 +478,7 @@ in
           DevicePolicy = "closed";
           CapabilityBoundingSet = "";
           ReadWritePaths = [ "/var/lib/grafana" ];
+          EnvironmentFile = "-/var/lib/secrets/grafana.env";
         };
       };
     })

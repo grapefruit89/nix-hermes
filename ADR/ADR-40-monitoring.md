@@ -1,77 +1,64 @@
 ---
-title:        "ADR-XX: Short Decision Title"
-domain:       XX
-folder:       XX-name
-status:       proposed
-date:         YYYY-MM-DD
-deciders:     [moritz]    # who made this call
-review_after: YYYY-MM-DD  # set 6-12 months out — forces re-evaluation
+title:        "ADR-40: Decentralized Dynamic Observability, Loopback SSH Sockets & CrowdSec Integration"
+domain:       40-monitoring
+folder:       40-monitoring
+status:       accepted
+date:         2026-06-05
+deciders:     [moritz, antigravity]
+review_after: 2027-06-05
 links:
-  guide:   XX-name.md
+  guide:   40-observability.md
   modules:
-    - modules/XX-name/relevant-module.nix
-  supersedes: []          # list ADR filenames this replaces, if any
+    - Nix Files/modules/40-observability.nix
+    - Nix Files/modules/15-firewall.nix
+supersedes: []
 ---
 
-# ADR-XX: Short Decision Title
+# ADR-40: Decentralized Dynamic Observability, Loopback SSH Sockets & CrowdSec Integration
 
-> **Decision in one sentence.**
-> We use X instead of Y because Z.
+> **We consolidate all observability (Gatus, Vector/Loki/Grafana logging, and CrowdSec IDS) into a unified domain module and decouple endpoint configs from static Nix code by loading Gatus endpoints dynamically at runtime, prioritizing Unix domain socket loopbacks for checks.**
 
 ---
 
 ## Context
 
 **What is the problem?**
-Describe the situation that forced a decision. Be specific about constraints:
-- System constraints (hardware, NixOS version, impermanence setup)
-- Operational constraints (single admin, no GUI, remote-only access)
-- Dependency constraints (what was already decided that limits options here)
+- In our previous configuration, Gatus monitoring had static health check endpoints hardcoded in the Nix files. Changing monitored endpoints required full NixOS rebuilds, which is slow and introduces friction.
+- Checking local system sockets (like PostgreSQL, Valkey, and Forgejo) typically requires exposing their respective TCP ports, which increases the server's network attack surface.
+- CrowdSec dynamic bouncer sets were not statically defined in the nftables firewall, leading to potential race conditions during firewall reloads where all bans are temporarily lifted before the bouncer can re-inject them.
+- Grafana's security key was hardcoded in Nix configurations, leaving it readable in the world-readable `/nix/store`.
 
 **Why does this matter?**
-What breaks or degrades if no decision is made, or if the wrong one is made?
+Hardcoding endpoints and secrets hurts security and flexibility. Leaving the CrowdSec sets undefined in static firewall rules compromises security during rebuilds.
 
 **Forces at play:**
-- Performance: ...
-- Security: ...
-- Maintainability: ...
-- Reversibility: ...
+- **Security:** Secret keys and private databases must not leak into the Nix store. Network exposure of internal services should be minimal.
+- **Maintainability:** AI agents and administrators should be able to update endpoints without running a full `nixos-rebuild switch`.
+- **Performance:** Local UDS monitoring should have minimal latency and not require network interface roundtrips.
 
 ---
 
 ## Considered Alternatives
 
-### Option A: [Name] ← CHOSEN
-
-**What it is:** Brief description.
+### Option A: Consolidated Observability Module with SSH Loopback Sockets & Declarative nftables Sets ← CHOSEN
+Consolidate all monitoring, VLG logging, and CrowdSec into `40-observability.nix`. Move Gatus endpoints to a runtime-loaded `/etc/gatus/endpoints.yaml`. Use an OpenSSH wrapper that restricts the `monitoring` user to check scripts, query local databases over Unix domain sockets, declare CrowdSec sets statically in `15-firewall.nix`, and load Grafana secrets via `EnvironmentFile`.
 
 **Pros:**
-- Concrete, specific advantage
-- Another specific advantage
+- Endpoints can be updated instantly by editing `endpoints.yaml` and restarting Gatus.
+- Services (PostgreSQL, Valkey, Forgejo) only need local UDS sockets, reducing TCP exposure.
+- Safe secret management using `/var/lib/secrets/` and `EnvironmentFile`.
+- Firewall rules are statically declared, ensuring CrowdSec bans are active immediately upon boot.
 
 **Cons:**
-- Concrete, specific disadvantage (be honest — every option has one)
-
-**Why chosen:** One sentence that directly addresses the dominant force from Context.
+- SSH loopback requires managing an SSH keypair for Gatus local check execution.
 
 ---
 
-### Option B: [Name] ← REJECTED
+### Option B: Hardcoded Nix Modules with TCP Port Exposure ← REJECTED
+Keep Gatus endpoints in Nix, expose database TCP ports for monitoring, and let the CrowdSec bouncer create dynamic nftables rules at runtime.
 
-**What it is:** Brief description.
-
-**Pros:**
-- Concrete advantage
-
-**Cons:**
-- The specific reason it was rejected
-
-**Why rejected:** One sentence. If the answer is "we didn't try it", say so honestly.
-
----
-
-### Option C: [Name] ← REJECTED
-*(Add only if genuinely evaluated — not to pad the ADR)*
+**Why rejected:**
+This setup leaks port exposure, requires Nix rebuilds for simple endpoint updates, and creates a security gap during firewall reloads.
 
 ---
 
@@ -79,43 +66,28 @@ What breaks or degrades if no decision is made, or if the wrong one is made?
 
 **We choose Option A.**
 
-Explicit scope: This decision applies to [what] and does NOT apply to [what].
+Explicit scope: This decision applies to Gatus, Vector, Loki, Grafana, CrowdSec, and nftables firewall integration on `q958` and development hosts.
 
-Any non-obvious implementation constraint that flows directly from this decision:
-- Constraint 1
-- Constraint 2
+Implementation constraints:
+- Gatus must run with a hardened systemd profile, using `CAP_NET_RAW` for pings.
+- The `monitoring` SSH user is globally restricted to the check wrapper.
+- All secrets are loaded from `/var/lib/secrets/` at runtime.
 
 ---
 
 ## Consequences
 
 **Positive:**
-- What becomes easier or better after this decision
-- What risk is eliminated
+- Updating monitored hosts/services is extremely fast.
+- Attack surface is minimized by UDS check prioritization.
+- Firewall security is robust and independent of bouncer startup timing.
 
 **Negative:**
-- What becomes harder (be honest — every real decision has a cost)
-- What flexibility is lost
-
-**Risks introduced:**
-- Specific risk, with mitigation: [how we address it]
+- Increased complexity due to loopback SSH key pair and command-forcing wrappers.
 
 ---
 
 ## Validation
 
-How will we know this decision is still correct?
-
-- **Metric / signal:** What to observe (log pattern, performance number, failure rate)
-- **Review trigger:** Re-evaluate this ADR if [specific condition] occurs
-- **Scheduled review:** See `review_after` in frontmatter
-
----
-
-<!-- SPEC-KIT CONSTRAINT REMINDER (delete before committing)
-     This ADR answers WHY. It must NOT contain:
-     - Nix code (→ belongs in the module)
-     - Step-by-step instructions (→ belongs in the guide)
-     - Vague rationale like "it's simpler" without explaining simpler for whom
-     If you find yourself writing a how-to, stop and move it to the guide.
--->
+- **Metric / signal:** Gatus dashboard shows all UDS and SSH loopback checks as green.
+- **Review trigger:** Re-evaluate this ADR if Gatus SSH authentication fails frequently or if new services require complex custom check binaries.
