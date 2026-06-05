@@ -24,7 +24,7 @@ Die gesamte Konfiguration und Dokumentation ist in 10 logische Domänen aufgetei
 - **_Templates:** Vorlagen und Blaupausen für neue Module, ADRs, Guides und User-Home-Konfigurationen.
 
 ### 📊 Single Source of Truth (SSoT) Databases
-- **nixos_docs.db:** Relationale SQLite-Dokumenten-Datenbank mit FTS5-Volltextsuche für blitzschnelles MCP-Wissensabfragen. **[Master SSoT-Gesetz]:** Diese Datenbank ist das absolute Führungsmedium der gesamten Infrastruktur. Alle physischen Dateien (Nix-Files, ADRs, Guides, Templates) müssen in regelmäßigen Abständen per Reverse-Sync aus der Datenbank aktualisiert werden. Templates sind mit dem Status `template` und dem Tag `template` indiziert.
+- **nixos_docs.db:** Relationale SQLite-Dokumenten-Datenbank mit FTS5-Volltextsuche für blitzschnelles MCP-Wissensabfragen. **[SSoT-Index-Gesetz]:** Die physischen Quelldateien (Nix-Files, ADRs, Guides, Templates) sind das autoritative Master-Medium und werden versioniert. Diese Datenbank dient als maschineller Master-Index für LLM-MCP-Abfragen und wird bei jedem Commit automatisch neu generiert. Templates sind mit dem Status `template` und dem Tag `template` indiziert.
 - **memdb.db:** Semantische LLM-Wissensdatenbank (via `@j0hanz/memdb`), die ADRs, Guides und Templates als vernetzte Dokumenten-Erinnerungen (Memories) und Beziehungs-Graphen abspeichert.
 
 ---
@@ -69,9 +69,9 @@ Wenn ein Ziel unklar definiert ist, ist Raten STRENGSTENS VERBOTEN.
 - **UDS-Gesetz:** Caddy ↔ Backend-Kommunikation bevorzugt via Unix Domain Sockets (UDS) für minimale Latenz und maximale Isolation. Für Programme ohne native UDS-Unterstützung (wie Radarr, Sonarr, SABnzbd) gilt localhost-TCP als deklarierter Standard-Fallback.
 - **Secrets:** Strikte `sops-nix` Purity. Keine Secrets im Nix-Store oder in Git-Commits.
 
-### 📊 Datenbanken & SSoT-Sync (Master Law)
-- **Database Master SSoT:** Die relationale `nixos_docs.db` ist das unumstößliche Führungsmedium. Jeglicher Code und jegliche Dokumentation müssen synchron zu ihr gehalten werden.
-- **Reverse-Sync Mandat:** Bei jeglichem Drift oder vor System-Deployments gilt die Datenbank als Master. Alle physischen Konfigurations- und Markdown-Dateien auf dem Dateisystem müssen per Reverse-Sync aus der Datenbank überschrieben und aktualisiert werden, um einen konsistenten Systemzustand zu garantieren.
+### 📊 Datenbanken & SSoT-Sync (SSoT Index Law)
+- **Database SSoT Index:** Die physischen Quelldateien sind die autoritative Quelle für Menschen und werden im Git-Repository versioniert. Die relationale `nixos_docs.db` ist das Master-Führungsmedium für maschinelle LLM-Abfragen.
+- **Forward-Sync Mandat:** Bei jeder Dateiänderung und jedem Git-Commit wird die Datenbank per `build_dbs.py` automatisch neu aus den physischen Dateien generiert (Forward-Sync), um einen konsistenten Wissenszustand für LLM-Agenten zu garantieren.
 
 ### ⚔️ Antipattern-Verbot (Zero Tolerance)
 Jede KI, die im Auftrag dieses Repositories arbeitet, MUSS vor der Implementierung eines Dienstes, einer Architektur oder eines Tools zwingend die Antipattern-Dokumentation in der SSoT-Datenbank konsultieren:
@@ -81,7 +81,7 @@ Es ist strengstens verboten, deklarierte Antipatterns (z. B. Thymis, Kopia, Glob
 ### 🔄 Closed-Loop Workflow
 - Jeder `git commit` triggert automatisch `tools/build_dbs.py` und `tools/validate_ssot.py` via Pre-Commit-Hook.
 - Deployment erfolgt ausschließlich über `tools/nixdeploy.ps1` (oder manuell mit vorangestelltem DB-Sync).
-- `nixos_docs.db` bleibt durch mechanische Hooks das einzige autoritative Wissen.
+- `nixos_docs.db` bleibt durch mechanische Hooks das autoritative maschinelle Wissen der LLM-Agenten.
 - Keine menschenlesbaren Reports; alle stakeholders sind LLMs.
 
 ### ✅ Validierungsregeln
@@ -101,6 +101,7 @@ Alle einmaligen Berichte, Audit-Ergebnisse, temporären Skripte und Notizen, die
 ---
 
 ## V. RECONCILIATION LOG
+- **v14.2:** Anpassung der SSoT-Regeln (Dateien sind Master, DB ist maschineller Index) für den pragmatischen Entwicklungsmodus.
 - **v14.1:** Verankerung des Database-Master SSoT und des Reverse-Sync Mandats in der Verfassung.
 - **v14.0:** Umstellung auf das saubere, deklarierte 10-Domain-Modell.
 - **FTS5 Integration:** Aktivierung der Volltext-Suche in der relationalen Datenbank.
