@@ -35,4 +35,5 @@ Oder betrete die Nix-Shell interaktiv:
 nix-shell tools/shell.nix
 python tools/build_dbs.py
 exit
+
 ```
