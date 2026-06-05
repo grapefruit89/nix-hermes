@@ -7,7 +7,7 @@
 # description: "System configuration for running the NixOS development environment inside WSL."
 # ------------------------------------------------------
 
-{ config, pkgs, lib, ... }:
+{ ... }:
 
 {
   # ─── IMPORTS ────────────────────────────────────────────────────────────────

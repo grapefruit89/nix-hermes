@@ -8,7 +8,7 @@ last_reviewed: 2026-05-26
 links:
   adr:     ADR-50-media.md
   modules:
-    - path: Nix Files/modules/50-media.nix
+    - path: Nix Files/modules/50-media/default.nix
 ---
 
 # Media Domain Guide: Sandboxed Stack & Radarr API Profile Import
@@ -201,4 +201,4 @@ vainfo
 
 ### SABnzbd Configuration Lock & Start Failures
 * **The Gotcha (GUI Settings Overwritten on Reboot):** By default, if the NixOS SABnzbd module manages the configuration file declaratively, any modifications made in the web interface (like server lists, indexers, or categories) will be wiped out when the system restarts.
-* **The Resolution:** Ensure that the configuration is writable by using `services.sabnzbd.configFile` pointing to a local write-enabled path under the `/persist` state directory (Tier A), rather than allowing the module to generate a static, read-only configuration inside the Nix store. Ensure `umask = 002` is active to maintain global GID 169 permission standards for newly downloaded media files.
+* **The Resolution:** Enable declarative settings merging with write support by setting `services.sabnzbd.allowConfigWrite = true;` and setting `services.sabnzbd.configFile = null;` to suppress deprecation warnings. Ensure `umask = 002` is active in systemd to maintain global GID 169 permission standards for newly downloaded media files.

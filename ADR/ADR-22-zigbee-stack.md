@@ -1,15 +1,15 @@
 ---
 title:        "ADR-22: Decoupled IoT & Zigbee2MQTT Architecture for SLZB-06"
-domain:       20
-folder:       20-security
+domain:       60
+folder:       60-apps
 status:       accepted
 date:         2026-05-26
 deciders:     [moritz]
 review_after: 2027-05-26
 links:
-  guide:   20-security.md
+  guide:   60-apps.md
   modules:
-    - Nix Files/modules/20-security.nix
+    - Nix Files/modules/60-apps/iot.nix
   supersedes: [36_Home_Assistant_SLZB06_STRATEGY.md, 52_APPS_UPGRADE_STORAGE_ZIGBEE_MARCH_2026.md]
 ---
 

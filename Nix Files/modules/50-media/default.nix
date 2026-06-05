@@ -19,7 +19,7 @@
 # reviewed:  2026-06-03
 # ---ENDNIXMETA---
 
-{ config, lib, pkgs, ... }:
+{ lib, ... }:
 
 {
   imports = [

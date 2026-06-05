@@ -9,7 +9,7 @@ review_after: 2027-05-26
 links:
   guide:   50-media.md
   modules:
-    - Nix Files/modules/50-media.nix
+    - Nix Files/modules/50-media/default.nix
   supersedes: [radarr_qualityprofiles.json, radarr_customformats.json]
 ---
 

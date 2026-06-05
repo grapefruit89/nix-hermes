@@ -119,19 +119,20 @@ in
     })
 
     (lib.mkIf cfgJellyseerr.enable {
-      services.jellyseerr = {
+      services.seerr = {
         enable = true;
+        port = portJellyseerr;
         openFirewall = false;
       };
 
       # Systemd Sandboxing Härtung
-      systemd.services.jellyseerr.serviceConfig = {
+      systemd.services.seerr.serviceConfig = {
         ProtectSystem = lib.mkForce "strict";
         ProtectHome = lib.mkForce true;
         PrivateTmp = lib.mkForce true;
         PrivateDevices = lib.mkForce true;
         NoNewPrivileges = lib.mkForce true;
-        ReadWritePaths = [ "/var/lib/jellyseerr" ];
+        ReadWritePaths = [ "/var/lib/seerr" ];
       };
 
       services.caddy.virtualHosts."seerr.${domain}" = {

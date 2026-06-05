@@ -13,7 +13,7 @@ links:
 
 # Storage Domain Guide: Hybrid Pooling, Spindown, & Pending Watcher
 
-> **Operational guide for managing the hybrid storage pool (ZFS + ext4 MergerFS), diagnosing mechanical HDD spindown states, integrating unlabelled hot-plugged drives via the Pending Disks Watcher, and verifying encrypted offsite Restic backups.**
+> **Operational guide for managing the hybrid storage pool (SSD + ext4 MergerFS), diagnosing mechanical HDD spindown states, integrating unlabelled hot-plugged drives via the Pending Disks Watcher, and verifying encrypted offsite Restic backups.**
 > Ensures maximum data integrity, predictable recovery, and high energy efficiency.
 
 ---
@@ -21,7 +21,7 @@ links:
 ## Prerequisites
 
 Before modifying filesystems, adding drives, or restoring backups, verify:
-- [x] Host has `zfs` kernel support active.
+- [x] Host has `ext4` and `btrfs` filesystem support active.
 - [x] Ephemeral root (`tmpfs`) is active, with `/persist` mapped to the persistent SSD cache drive (Tier A).
 - [x] The `media` group exists with GID 169 (NixOS-declared).
 
@@ -41,10 +41,10 @@ Before modifying filesystems, adding drives, or restoring backups, verify:
                              [Tier C: ext4 JBOD] ◄─── (Spun down 99% of time)
                                      ▲
                                      │ (Virtual pooling)
-[Jellyfin / Media Stack] ◄─── [MergerFS: /mnt/media] ◄─── [ZFS: Irreplaceable State]
+[Jellyfin / Media Stack] ◄─── [MergerFS: /mnt/media] ◄─── [SSD: Irreplaceable State]
 ```
 
-1. **Hybrid Virtualization:** MergerFS pools ZFS datasets (Tier A) and ext4 drives (Tier C) under `/mnt/media`. Jellyfin and other apps interact with `/mnt/media` seamlessly.
+1. **Hybrid Virtualization:** MergerFS pools ext4 drives (Tier C) under `/mnt/media`, virtualized alongside local SSD storage (Tier A). Jellyfin and other apps interact with `/mnt/media` and SSD state directories seamlessly.
 2. **First Found Write:** New files are written exclusively to the SSD Cache (Tier B) to prevent mechanical HDD spin-ups.
 3. **Pending Watcher:** Unformatted connected drives are flagged by `nixhome-pending-watcher` and stored as `.pending` files to block silent raw writes.
 4. **State Protection:** Crucial databases (PostgreSQL, Vaultwarden, age keys) are backed up securely using locally encrypted Restic offsite S3 uploads.
@@ -134,8 +134,8 @@ mountpoint -q /mnt/media && echo "PASS: mergerfs active"
 # 2. Verify pending watcher timer is running
 systemctl is-active --quiet nixhome-pending-watcher.timer && echo "PASS: watcher timer active"
 
-# 3. Verify ZFS zpool status is healthy
-zpool status -x | grep -q "all pools are healthy" && echo "PASS: zfs healthy"
+# 3. Verify persistent storage filesystem is healthy
+df -h /persist && echo "PASS: persist storage active"
 ```
 
 ---

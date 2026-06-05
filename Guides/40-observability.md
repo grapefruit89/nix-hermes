@@ -26,7 +26,6 @@ Gatus läuft auf dem Host und lauscht ausschließlich auf `127.0.0.1:8084` (SSO-
 #### 1. Network & Connectivity (Gruppe: `network`)
 - **Internet Ping**: `icmp://1.1.1.1` prüft die WAN-Erreichbarkeit alle 30 Sekunden.
 - **Blocky DNS Resolver**: `dns://127.0.0.1:53` prüft, ob `cloudflare.com` mit `NOERROR` aufgelöst wird.
-- **AdGuard Home**: `tcp://127.0.0.1:3053` prüft, ob der DNS-Fallback-Port lauscht.
 
 #### 2. Storage & Pools (Gruppe: `storage`)
 - **MergerFS Fast Pool**: SSH-Check führt `/run/current-system/sw/bin/check-fast-pool` aus (prüft `/mnt/fast_pool` und aktive Tier B Branches).

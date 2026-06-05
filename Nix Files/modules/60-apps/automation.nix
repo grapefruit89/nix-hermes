@@ -15,7 +15,7 @@
 # reviewed:  2026-06-03
 # ---ENDNIXMETA---
 
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 
 let
   cfgPaperless = config.my.services.paperless;

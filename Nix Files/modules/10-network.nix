@@ -282,6 +282,13 @@ in
             http = config.my.services.blocky.metricsPort;
           };
           upstreams.groups.default = config.my.services.blocky.upstreamDns;
+          customDNS = {
+            mapping = {
+              "nixhome.local" = lanIP;
+              "${domain}" = lanIP;
+              "nix.${domain}" = lanIP;
+            };
+          };
         };
       };
     })

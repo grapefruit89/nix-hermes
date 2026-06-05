@@ -8,7 +8,7 @@
 # description: "System-level configuration for the headless home server. Connects all flat modules."
 # ------------------------------------------------------
 
-{ config, pkgs, lib, ... }:
+{ ... }:
 
 {
   # ─── IMPORTS ────────────────────────────────────────────────────────────────

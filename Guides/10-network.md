@@ -13,7 +13,7 @@ links:
 
 # Network & Database Guide: DNS Resolver, Valkey Cache & PostgreSQL Server
 
-> **Operational guide for managing the homelab DNS server (AdGuard Home), Valkey key-value cache database, and the core PostgreSQL server on the fast NVMe/SSD tier.**
+> **Operational guide for managing the homelab DNS server (Blocky), Valkey key-value cache database, and the core PostgreSQL server on the fast NVMe/SSD tier.**
 > Ensures local network resolution, caching efficiency, and database transaction stability.
 
 ---
@@ -29,7 +29,7 @@ Before performing database operations, ensure:
 
 ## How It Works
 
-- **AdGuard Home DNS:** Acts as the primary recursive nameserver for all LAN and Tailscale clients, using Cloudflare DoH as upstreams and maintaining an aggressive 32MB local RAM cache.
+- **Blocky DNS:** Acts as the primary DNS resolver for all LAN and Tailscale clients, forwarding queries to secure upstreams and resolving local hostnames (`nixhome.local`, `*.m7c5.de`) via custom mappings.
 - **Valkey Caching:** Provides local in-memory caching on port `6379` for paperless, n8n, etc., automatically evicting oldest keys using `allkeys-lru` policies when hitting the 256MB limit.
 - **PostgreSQL Server:** Acts as the transactional database engine. Data resides on fast SSD subvolumes `/data/state/postgresql-live` to guarantee high POSIX lock performance and eliminate Mechanical HDD read/write wear.
 
@@ -82,7 +82,7 @@ sudo -u redis valkey-cli monitor
 
 ---
 
-### AdGuard Home DNS Diagnostics
+### Blocky DNS Diagnostics
 
 #### 1. Checking DNS Resolution Status
 Verify local loopback resolution:
@@ -90,9 +90,9 @@ Verify local loopback resolution:
 dig @127.0.0.1 -p 53 nixhome.local
 ```
 
-#### 2. Scrape/View Query Statistics via API
+#### 2. Verify Blocky Query Resolution
 ```bash
-curl -s http://127.0.0.1:20080/control/stats
+dig @127.0.0.1 -p 53 google.com
 ```
 
 ---
@@ -110,8 +110,8 @@ ls -la /run/postgresql/.s.PGSQL.5432 && echo "PASS: Socket online"
 systemctl is-active --quiet redis-valkey && echo "PASS: Valkey active"
 ss -tlnp | grep 6379 && echo "PASS: Valkey port open"
 
-# 3. AdGuard Home is active and listening on port 53
-systemctl is-active --quiet AdGuardHome && echo "PASS: AdGuard active"
+# 3. Blocky DNS is active and listening on port 53
+systemctl is-active --quiet blocky && echo "PASS: Blocky active"
 ss -ulnp | grep :53 && echo "PASS: DNS port open"
 ```
 

@@ -28,7 +28,6 @@ let
   cfgSsh = config.my.security.ssh-zerotrust;
 
   user = config.my.configs.identity.user;
-  domain = config.my.configs.identity.domain;
   sshPort = config.my.ports.ssh;
   hasAuthorizedKeys = (config.users.users.${user}.openssh.authorizedKeys.keys or [ ]) != [ ];
 

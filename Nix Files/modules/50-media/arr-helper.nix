@@ -10,7 +10,7 @@
 
 # arr-helper.nix
 # Shared helper to generate standardized *Arr services.
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 
 {
   mkArrService = { name, port, dataDir, uid, gid }: {

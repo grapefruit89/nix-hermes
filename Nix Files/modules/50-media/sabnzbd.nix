@@ -14,7 +14,7 @@
 # reviewed:  2026-06-03
 # ---ENDNIXMETA---
 
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 
 let
   cfgSabnzbd = config.my.services.sabnzbd;
@@ -27,7 +27,14 @@ in
     services.sabnzbd = {
       enable = true;
       openFirewall = false;
-      configFile = "/var/lib/sabnzbd/sabnzbd.ini";
+      configFile = null;
+      allowConfigWrite = true;
+      settings = {
+        misc = {
+          port = portSabnzbd;
+          host = "127.0.0.1";
+        };
+      };
     };
 
     # GID/UID und Gruppen-Anpassung

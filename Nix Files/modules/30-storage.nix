@@ -30,8 +30,6 @@ let
   cfgStorage = config.my.services.storage;
   cfgBackup = config.my.services.restic-backup;
 
-  ramGB = config.my.configs.hardware.ramGB;
-  domain = config.my.configs.identity.domain;
 
   # Tier A (NVMe/SSD Cache): Persistent high-priority states
   tierA = {
@@ -45,7 +43,7 @@ let
       "/root/.hermes"
       "/var/lib/vaultwarden"
       "/var/lib/jellyfin"
-      "/var/lib/jellyseerr"
+      "/var/lib/seerr"
       "/var/lib/sonarr"
       "/var/lib/radarr"
       "/var/lib/readarr"
@@ -319,10 +317,17 @@ in
         environmentFile = "/var/lib/secrets/restic_s3_creds";
 
         paths = [
+          "${cfgImp.persistMountPoint}/var/lib/secrets"
           "${cfgImp.persistMountPoint}/var/lib/postgresql"
           "${cfgImp.persistMountPoint}/var/lib/vaultwarden"
           "${cfgImp.persistMountPoint}/var/lib/pocket-id"
-          "${cfgImp.persistMountPoint}/var/lib/AdGuardHome"
+          "${cfgImp.persistMountPoint}/var/lib/hass"
+          "${cfgImp.persistMountPoint}/var/lib/zigbee2mqtt"
+          "${cfgImp.persistMountPoint}/var/lib/paperless"
+          "${cfgImp.persistMountPoint}/var/lib/linkwarden"
+          "${cfgImp.persistMountPoint}/var/lib/forgejo"
+          "${cfgImp.persistMountPoint}/var/lib/semaphore"
+          "${cfgImp.persistMountPoint}/var/lib/grafana"
           "${cfgImp.persistMountPoint}/etc/nixos"
         ];
 

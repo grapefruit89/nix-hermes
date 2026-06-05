@@ -87,12 +87,12 @@ endpoints:
     conditions:
       - "[DNS_RC] == NOERROR"
 
-  - name: "adguard-home"
-    group: "network"
-    url: "tcp://127.0.0.1:3053"
-    interval: "1m"
-    conditions:
-      - "[CONNECTED] == true"
+#  - name: "adguard-home"
+#    group: "network"
+#    url: "tcp://127.0.0.1:3053"
+#    interval: "1m"
+#    conditions:
+#      - "[CONNECTED] == true"
 
   - name: "ssh-daemon"
     group: "core"

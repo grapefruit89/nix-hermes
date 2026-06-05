@@ -119,6 +119,7 @@ in
             mqtt = {
               base_topic = "zigbee2mqtt";
               server = "mqtt://127.0.0.1:${toString cfgZigbee.mqttPort}";
+              user = "zigbee2mqtt";
             };
             serial = {
               port = cfgZigbee.zigbeeDevice;
@@ -165,6 +166,7 @@ in
               PrivateDevices = lib.mkForce (if (lib.hasPrefix "/dev/" cfgZigbee.zigbeeDevice) then false else true);
               DeviceAllow = lib.optional (lib.hasPrefix "/dev/" cfgZigbee.zigbeeDevice) "${cfgZigbee.zigbeeDevice} rw";
               RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
+              EnvironmentFile = "/var/lib/secrets/zigbee2mqtt.env";
             };
           };
         };

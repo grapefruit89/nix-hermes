@@ -15,7 +15,7 @@ links:
 
 # ADR-30: Hybrid Pooling, ext4 + MergerFS Media Stack, & Pending Disks Watcher
 
-> **We establish a hybrid storage pooling model for our homelab. We utilize ZFS datasets specifically for high-integrity, irreplaceable files (documents, photos) requiring automated snapshots and scrubbing, while using an ext4 JBOD array pooled via MergerFS for our media collection. We reject SnapRAID due to sync lag, and deploy the automated 'nixhome-pending-watcher' watchdog timer to detect unlabelled disks dynamically.**
+> **We establish a hybrid storage pooling model for our homelab. We utilize local SSD storage (Btrfs/ext4) specifically for high-integrity, irreplaceable files (documents, databases) requiring automated backups, while using an ext4 JBOD array pooled via MergerFS for our media collection. We reject SnapRAID due to sync lag, and deploy the automated 'nixhome-pending-watcher' watchdog timer to detect unlabelled disks dynamically.**
 
 ---
 
@@ -34,10 +34,10 @@ A premium homelab architecture requires silent, energy-efficient mechanical disk
 
 ## Considered Alternatives
 
-### Option A: ZFS (Irreplaceable Core) + MergerFS (Media Array) + Pending Watcher ← CHOSEN
+### Option A: SSD Tier (Irreplaceable Core) + MergerFS (Media Array) + Pending Watcher ← CHOSEN
 
 **What it is:**
-Unersetzbare Daten (photos, code, private docs) reside on ZFS datasets where snapshots and byte-level checksums are active. The rest of the media stack (replaceable movies, TV shows) resides on individual ext4 disks pooled virtually under a single `/mnt/media` mountpoint via MergerFS. New write requests are routed to the SSD cache (Tier B) via the `category.create=ff` policy. Newly plugged unformatted disks are identified by the `nixhome-pending-watcher` service and written as `.pending` states to `/run/nixhome-pending-disks/` to alert the administrator.
+Unersetzbare Daten (databases, secrets, configuration) reside on the local SSD tier `/persist` (ext4/Btrfs) where automated Restic backups are active. The rest of the media stack (replaceable movies, TV shows) resides on individual ext4 disks pooled virtually under a single `/mnt/media` mountpoint via MergerFS. New write requests are routed to the SSD cache (Tier B) via the `category.create=ff` policy. Newly plugged unformatted disks are identified by the `nixhome-pending-watcher` service and written as `.pending` states to `/run/nixhome-pending-disks/` to alert the administrator.
 
 **Pros:**
 - **Optimal HDD Spindown:** Reading a movie spins up *only* the single disk containing that file. The other mechanical drives remain completely sleeping.
@@ -46,7 +46,7 @@ Unersetzbare Daten (photos, code, private docs) reside on ZFS datasets where sna
 - **Automated Discovery:** Hot-plugged drives are flagged instantly by the pending disks watcher.
 
 **Cons:**
-- Requires maintaining ZFS and MergerFS filesystems concurrently.
+- SSD storage is limited by local drive capacity.
 
 ---
 
@@ -64,7 +64,7 @@ High operational overhead. The daily parity sync creates a vulnerability window 
 **We choose Option A.**
 
 We declare:
-1. **Hybrid Storage:** Enforce ZFS for irreplaceable data and ext4 + MergerFS for media pooling.
+1. **Hybrid Storage:** Enforce local SSD storage (Btrfs/ext4) for irreplaceable data and ext4 + MergerFS for media pooling.
 2. **Mount Optimizations:** Mount MergerFS pool with `category.create=ff`, `minfreespace=50G`, and `dropcacheonclose=true` parameters.
 3. **Pending Disks Watchdog:** Periodic execution of the `nixhome-pending-watcher` timer.
 4. **Offline Cache Protection:** Standardize on Restic cloud encryption routines for Tier A state.
