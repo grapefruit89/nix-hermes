@@ -2,6 +2,7 @@ node_modules/
 *.db
 *.sqlite
 *.sqlite3
+*.sql
 import.sql
 .temp_workfolder/
 secrets.sops.yaml
