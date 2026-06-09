@@ -30,7 +30,6 @@ let
   cfgStorage = config.my.services.storage;
   cfgBackup = config.my.services.restic-backup;
 
-
   # Tier A (NVMe/SSD Cache): Persistent high-priority states
   tierA = {
     paths = [
@@ -59,6 +58,8 @@ let
       "/var/lib/linkwarden"
       "/var/lib/loki"
       "/var/lib/grafana"
+      "/var/lib/caddy"
+      "/var/lib/gatus"
       "/var/lib/crowdsec"
       "/var/lib/forgejo"
       "/var/lib/semaphore"
@@ -69,6 +70,9 @@ let
     ];
   };
 
+  # Journald persistent storage (forensics and crash debugging)
+  journaldPath = "/var/log/journal";
+
   # Tier B (SSD Pool): Speed-sensitive volatile caches and incomplete downloads
   tierB = {
     paths = [
@@ -77,6 +81,9 @@ let
       "/var/cache"
     ];
   };
+
+  # Boot partition path for monitoring
+  bootMountPoint = "/boot";
 
 in
 {
@@ -204,7 +211,26 @@ in
       # Enforce state structure creation in /persist
       systemd.tmpfiles.rules =
         (map (p: "d ${cfgImp.persistMountPoint}${p} 0755 root root -") tierA.paths) ++
-        (map (p: "d ${p} 0755 root root -") tierB.paths);
+        (map (p: "d ${p} 0755 root root -") tierB.paths) ++
+        [ "d ${journaldPath} 0755 root root -" ];
+
+      # Bind-mount persistent journald directory
+      fileSystems."${journaldPath}" = {
+        device = "${cfgImp.persistMountPoint}${journaldPath}";
+        fsType = "none";
+        options = [ "bind" ];
+        depends = [ cfgImp.persistMountPoint ];
+      };
+
+      # Journald persistent storage for forensics
+      services.journald = {
+        extraConfig = ''
+          Storage=persistent
+          SystemMaxUse=1G
+          RuntimeMaxUse=100M
+          MaxRetentionSec=1month
+        '';
+      };
     })
 
     # ── MERGERFS HYBRID POOLING ───────────────────────────────────────────────
@@ -293,7 +319,7 @@ in
             ProtectSystem = "strict";
             ProtectHome = true;
             PrivateNetwork = true;
-            ReadWritePaths = [ "/run/nixhome-pending-disks" ];
+            ReadWritePaths = [ "/run/nixhome-pending-watcher" ];
             CapabilityBoundingSet = [ "CAP_SYS_ADMIN" ];
           };
         };
@@ -373,10 +399,10 @@ in
             Type = "oneshot";
             ExecStart = pkgs.writeShellScript "storage-mover" ''
               set -euo pipefail
-            
+              
               # Check current SSD cache capacity
               CACHE_USAGE=$(df -h "${cfgMover.sourceDir}" | awk 'NR==2 {print $5}' | sed 's/%//')
-            
+              
               # Helper to check if any of our storage disks are already spinning
               disks_spinning=false
               for dev in /dev/disk/by-label/DISK_STORAGE_* /dev/disk/by-label/TIER_C_*; do
