@@ -1,8 +1,10 @@
-node_modules/
 *.db
+*.py
+*.sql
 *.sqlite
 *.sqlite3
-*.sql
-import.sql
 .temp_workfolder/
+import.sql
+node_modules/
 secrets.sops.yaml
+tools/
